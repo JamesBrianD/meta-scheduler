@@ -40,6 +40,7 @@ fi
 
 echo "========== [4/4] gh 登录 =========="
 run_as_user "echo '${GH_TOKEN}' | gh auth login --with-token"
+run_as_user "gh auth setup-git"
 run_as_user "gh auth status"
 
 echo ""
