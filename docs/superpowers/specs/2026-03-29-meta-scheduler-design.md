@@ -322,6 +322,7 @@ meta-scheduler/
 | `@anthropic-ai/claude-agent-sdk` | Claude Code programmatic invocation (for local executor) |
 | `chalk` | Terminal colors |
 
+<<<<<<< HEAD
 ## Claude Code Skill
 
 A single skill `meta-scheduler` teaches any Claude Code instance how to use the `ms` CLI. Follows the standard skill structure: `SKILL.md` + `references/commands.md` for progressive disclosure.
@@ -434,6 +435,8 @@ Sections:
 - After updating, verify with `claude skills list` to confirm CC can discover it
 - The `description` frontmatter must only contain trigger conditions, never workflow summaries
 
+=======
+>>>>>>> 40c1f21 (Add meta-scheduler design spec)
 ## Implementation Priority
 
 Phase 1 (MVP):
@@ -442,6 +445,7 @@ Phase 1 (MVP):
 3. Worker CRUD (add/remove/list)
 4. Slot operations: `ms run`, `ms list`, `ms attach`, `ms kill`
 5. Slot status checking
+<<<<<<< HEAD
 6. Generate `meta-scheduler` skill with worker + slot commands
 
 Phase 2 (Context Reuse):
@@ -461,6 +465,23 @@ Phase 4 (Polish):
 16. K8s connector
 17. `ms status` dashboard
 18. Update skill with final command syntax, package with package_skill.py
+=======
+
+Phase 2 (Context Reuse):
+6. `ms resume` (idle slot reuse via claude --resume)
+7. `ms send` (message running slot)
+8. `ms logs`
+
+Phase 3 (Task Queue):
+9. Task CRUD + queue
+10. Dispatcher (priority + dependency resolution)
+11. `ms queue dispatch`
+
+Phase 4 (Polish):
+12. `ms pr` (commit + push + PR creation)
+13. K8s connector
+14. `ms status` dashboard
+>>>>>>> 40c1f21 (Add meta-scheduler design spec)
 
 ## Open Questions
 
