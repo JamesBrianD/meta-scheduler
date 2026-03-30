@@ -133,7 +133,7 @@ class SSHConnector implements Connector {
   async exec(command: string): Promise<ExecResult> {
     const args = this.sshArgs();
     const target = `${this.user}@${this.host}`;
-    const fullCmd = `ssh ${args.map(shellEscape).join(' ')} ${shellEscape(target)} ${shellEscape(command)}`;
+    const fullCmd = `ssh ${args.join(' ')} ${shellEscape(target)} ${shellEscape(command)}`;
     try {
       const { stdout, stderr } = await execAsync(fullCmd, { maxBuffer: 10 * 1024 * 1024 });
       return { stdout, stderr, code: 0 };
@@ -189,15 +189,14 @@ class K8sConnector implements Connector {
 
   async exec(command: string): Promise<ExecResult> {
     const args = [...this.baseArgs(), '--', 'bash', '-c', command];
-    const fullCmd = `kubectl ${args.map(shellEscape).join(' ')}`;
     try {
-      const { stdout, stderr } = await execAsync(fullCmd, { maxBuffer: 10 * 1024 * 1024 });
-      return { stdout, stderr, code: 0 };
+      const { stdout, stderr } = await execFileAsync('kubectl', args, { maxBuffer: 10 * 1024 * 1024 });
+      return { stdout: stdout as string, stderr: stderr as string, code: 0 };
     } catch (err: unknown) {
       const e = err as { code?: number; stdout?: string; stderr?: string };
       return {
-        stdout: e.stdout ?? '',
-        stderr: e.stderr ?? '',
+        stdout: (e.stdout as string) ?? '',
+        stderr: (e.stderr as string) ?? '',
         code: typeof e.code === 'number' ? e.code : 1,
       };
     }

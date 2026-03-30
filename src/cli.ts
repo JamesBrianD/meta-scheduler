@@ -265,8 +265,8 @@ program
   .action(async (opts: { all?: boolean }) => {
     try {
       await syncSlotStatuses();
-    } catch {
-      // Sync failures are non-fatal — show stale data
+    } catch (err: unknown) {
+      console.warn(chalk.yellow(`Warning: Failed to sync slot statuses, data may be stale. ${(err as Error).message}`));
     }
 
     const slots = listSlots(opts.all ?? false);

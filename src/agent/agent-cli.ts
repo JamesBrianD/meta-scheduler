@@ -48,7 +48,7 @@ program
       const statuses = await getStatusLocal(opts.id);
       console.log(JSON.stringify(statuses));
     } catch (err: unknown) {
-      console.log(JSON.stringify({ error: (err as Error).message }));
+      console.log(JSON.stringify({ ok: false, error: (err as Error).message }));
       process.exit(1);
     }
   });
@@ -62,7 +62,7 @@ program
       const result = await getLogsLocal(opts.id);
       console.log(JSON.stringify(result));
     } catch (err: unknown) {
-      console.log(JSON.stringify({ error: (err as Error).message }));
+      console.log(JSON.stringify({ ok: false, error: (err as Error).message }));
       process.exit(1);
     }
   });
@@ -76,7 +76,7 @@ program
       const result = await killSlotLocal(opts.id);
       console.log(JSON.stringify(result));
     } catch (err: unknown) {
-      console.log(JSON.stringify({ error: (err as Error).message }));
+      console.log(JSON.stringify({ ok: false, error: (err as Error).message }));
       process.exit(1);
     }
   });
@@ -92,7 +92,7 @@ program
       const envVars = JSON.parse(opts.envJson) as Record<string, string>;
       attachSlotLocal(opts.id, { resume: opts.resume, envVars });
     } catch (err: unknown) {
-      console.error(JSON.stringify({ error: (err as Error).message }));
+      console.error((err as Error).message);
       process.exit(1);
     }
   });
