@@ -299,6 +299,11 @@ meta-scheduler/
 │   │   └── local-connector.ts  # Local exec implementation
 │   ├── dispatcher.ts           # Task → Slot matching and dispatch
 │   └── git.ts                  # Git operations (clone, push, PR)
+├── skills/
+│   └── meta-scheduler/         # Claude Code skill (standard structure)
+│       ├── SKILL.md            # Skill entry point
+│       └── references/
+│           └── commands.md     # Full command reference (progressive disclosure)
 ├── package.json
 ├── tsconfig.json
 ├── CLAUDE.md
@@ -317,6 +322,118 @@ meta-scheduler/
 | `@anthropic-ai/claude-agent-sdk` | Claude Code programmatic invocation (for local executor) |
 | `chalk` | Terminal colors |
 
+## Claude Code Skill
+
+A single skill `meta-scheduler` teaches any Claude Code instance how to use the `ms` CLI. Follows the standard skill structure: `SKILL.md` + `references/commands.md` for progressive disclosure.
+
+### Skill Directory
+
+```
+skills/meta-scheduler/
+├── SKILL.md              # Core instructions (~700 words)
+└── references/
+    └── commands.md       # Full command reference with all flags
+```
+
+After building the CLI, install the skill so Claude Code auto-discovers it:
+```bash
+claude skills add ./skills/meta-scheduler
+```
+
+### SKILL.md Content
+
+```markdown
+---
+name: meta-scheduler
+description: Manage remote Claude Code instances across SSH, K8s, and local workers using the `ms` CLI. Use when the user wants to dispatch tasks to remote machines, run Claude Code on a specific worker, resume or interact with existing CC sessions (slots), manage a task queue with priorities and dependencies, or check the status of running CC instances. Trigger phrases include "run this on [worker]", "dispatch to [machine]", "resume slot", "attach to slot", "queue this task", "check worker status", "create PR from slot".
+---
+
+# Meta-Scheduler CLI (`ms`)
+
+Manage Claude Code sessions (slots) on remote workers via SSH/kubectl/local.
+
+## Before acting
+
+Run `ms list` to see current slot states before choosing a command. Run `ms worker list` to see available workers.
+
+## Syntax
+
+```bash
+ms <command> [subcommand] [args] [--flags]
+```
+
+Run `ms help` or `ms <command> --help` for full options.
+
+## Core operations
+
+### Run a new slot (fresh CC instance)
+```bash
+ms run "<prompt>" --worker <name> --repo <git-url> [--path <dir>]
+```
+
+### Resume an idle slot (keep full context)
+```bash
+ms resume <slot-id> "<prompt>"
+```
+Use when slot status is `idle` and the user wants to continue previous work.
+
+### Send message to a running slot
+```bash
+ms send <slot-id> "<message>"
+```
+Use when slot status is `running` and CC is waiting for input.
+
+### Attach interactively
+```bash
+ms attach <slot-id>
+```
+
+## Decision flow
+
+1. `ms list` — check slot states
+2. User references existing work → find matching slot:
+   - `idle` → `ms resume`
+   - `running` → `ms send`
+3. User wants fresh work → `ms run --worker <w>`
+4. User wants direct control → `ms attach`
+
+## Common patterns
+
+```bash
+ms worker list                                          # See available workers
+ms run "fix the login bug" --worker gpu-vm --repo git@github.com:user/app.git
+ms list                                                 # Check all slot statuses
+ms resume slot-2 "add tests for the fix"                # Continue on idle slot
+ms attach slot-2                                        # Jump into live session
+ms logs slot-2 --tail 20                                # Read recent output
+ms pr slot-2 --title "Fix login bug"                    # Commit + push + PR
+ms queue add "refactor auth" --worker gpu-vm --priority high
+ms queue dispatch                                       # Dispatch queued tasks
+```
+
+## Full reference
+
+See [references/commands.md](references/commands.md) for all commands, flags, and options.
+```
+
+### references/commands.md Content
+
+A complete reference of all `ms` commands with every flag and option. Loaded only when Claude needs detailed flag info. Content tracks the CLI implementation — update this file whenever commands change.
+
+Sections:
+1. **Worker commands**: `ms worker add|remove|list` with all type-specific flags
+2. **Slot commands**: `ms run|resume|send|attach|kill|list|logs|status` with all flags
+3. **Queue commands**: `ms queue add|list|dispatch` with priority/dependency flags
+4. **PR commands**: `ms pr` with title/body flags
+
+### Skill Generation Rules
+
+- The skill is generated at the end of Phase 1 with worker + slot commands
+- Each subsequent phase updates the same skill (not separate files)
+- `SKILL.md` stays under 700 words; new command details go into `references/commands.md`
+- After updating, verify with `claude skills list` to confirm CC can discover it
+- The `description` frontmatter must only contain trigger conditions, never workflow summaries
+
 ## Implementation Priority
 
 Phase 1 (MVP):
@@ -325,21 +442,25 @@ Phase 1 (MVP):
 3. Worker CRUD (add/remove/list)
 4. Slot operations: `ms run`, `ms list`, `ms attach`, `ms kill`
 5. Slot status checking
+6. Generate `meta-scheduler` skill with worker + slot commands
 
 Phase 2 (Context Reuse):
-6. `ms resume` (idle slot reuse via claude --resume)
-7. `ms send` (message running slot)
-8. `ms logs`
+7. `ms resume` (idle slot reuse via claude --resume)
+8. `ms send` (message running slot)
+9. `ms logs`
+10. Update skill: add resume/send/logs to SKILL.md and references/commands.md
 
 Phase 3 (Task Queue):
-9. Task CRUD + queue
-10. Dispatcher (priority + dependency resolution)
-11. `ms queue dispatch`
+11. Task CRUD + queue
+12. Dispatcher (priority + dependency resolution)
+13. `ms queue dispatch`
+14. Update skill: add queue commands
 
 Phase 4 (Polish):
-12. `ms pr` (commit + push + PR creation)
-13. K8s connector
-14. `ms status` dashboard
+15. `ms pr` (commit + push + PR creation)
+16. K8s connector
+17. `ms status` dashboard
+18. Update skill with final command syntax, package with package_skill.py
 
 ## Open Questions
 
