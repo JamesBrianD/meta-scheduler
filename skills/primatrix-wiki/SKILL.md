@@ -48,5 +48,11 @@ cat docs/.vitepress/config.ts             # sidebar navigation
 4. **Lint**: `npx markdownlint-cli2 docs/path/to/article.md` — see `references/conventions.md` for rules
 5. **Commit**: Stage article + config.ts, commit with `docs: ...` prefix
 6. **PR**: Use `beaver-pr` skill, or push and `gh pr create`
+7. **Review**: After PR creation, fetch review comments from humans and AI reviewers (CodeRabbit, Gemini). Proactively address each comment, commit fixes, and push.
+
+   ```bash
+   gh pr view <PR_NUMBER> --json comments --jq '.comments[].body'
+   gh api repos/primatrix/wiki/pulls/<PR_NUMBER>/comments --jq '.[].body'
+   ```
 
 Before writing, read `references/conventions.md` for content and formatting rules.
