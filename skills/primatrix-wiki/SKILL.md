@@ -5,44 +5,47 @@ description: Read, create, or edit articles in the primatrix/wiki VitePress site
 
 # Primatrix Wiki
 
-Internal wiki at `primatrix/wiki`, a VitePress site deployed on Cloudflare Pages.
+Internal wiki powered by VitePress, deployed at <https://wiki.infiscale-infra.org/>.
 
-**Repo**: `/Users/ramezes/job/wiki` — all operations run from this directory.
+- **GitHub**: `primatrix/wiki`
+- **Deploy**: Cloudflare Pages (auto on push to main)
 
 ## Before Acting
 
-Discover the wiki's current structure and available sections:
+Determine which mode to use:
+
+- **Read-only** (lookup, search) → Use GitHub API or fetch the deployed site. No local clone needed.
+- **Write** (create/edit articles, submit PRs) → Need a local clone. Check if the current directory is the wiki repo (`git remote -v | grep primatrix/wiki`). If not, clone it: `gh repo clone primatrix/wiki`.
+
+For write operations, discover the wiki structure first:
 
 ```bash
-# Sections and projects
-ls docs/projects/ docs/
-# Sidebar navigation structure
-cat docs/.vitepress/config.ts
-# Existing articles in a section
-find docs/<section>/ -name "*.md"
+ls docs/projects/ docs/                   # available sections
+cat docs/.vitepress/config.ts             # sidebar navigation
 ```
 
 ## Decision Flow
 
-1. **User wants to find or read content?**
-   - Search: `grep -r "keyword" docs/ --include="*.md" -l`
-   - Read the matched article(s) and summarize for the user
+1. **Find or read content?**
+   - Deployed site: `WebFetch https://wiki.infiscale-infra.org/<section>/<slug>`
+   - GitHub: `gh api repos/primatrix/wiki/contents/docs/<path> --jq .content | base64 -d`
+   - Local (if cloned): search with Grep/Glob in the `docs/` directory
 
-2. **User wants to create a new article?**
+2. **Create a new article?**
    - Ask or infer: which section/project does it belong to?
    - Read 1-2 existing articles in that section to match the local style
    - Follow the **New Article Workflow** below
 
-3. **User wants to edit an existing article?**
+3. **Edit an existing article?**
    - Locate the file, read it, make changes
-   - Run lint: `npx markdownlint-cli2 docs/path/to/article.md`
-   - Commit and push (or PR via `beaver-pr`)
+   - Lint: `npx markdownlint-cli2 docs/path/to/article.md`
+   - Commit and PR via `beaver-pr`
 
 ## New Article Workflow
 
 1. **Branch**: `git checkout -b docs/<descriptive-slug>`
 2. **Write**: Create `.md` in the appropriate `docs/` subdirectory
-3. **Sidebar**: Add entry to `docs/.vitepress/config.ts` — every new page needs one, or it won't appear in navigation. See `references/conventions.md` for link format.
+3. **Sidebar**: Add entry to `docs/.vitepress/config.ts` — every new page needs one, or it won't appear in navigation. See `references/conventions.md` for format.
 4. **Lint**: `npx markdownlint-cli2 docs/path/to/article.md` — see `references/conventions.md` for rules
 5. **Commit**: Stage article + config.ts, commit with `docs: ...` prefix
 6. **PR**: Use `beaver-pr` skill, or push and `gh pr create`
