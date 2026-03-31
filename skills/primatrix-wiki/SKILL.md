@@ -49,12 +49,4 @@ cat docs/.vitepress/config.ts             # sidebar navigation
 5. **Commit**: Stage article + config.ts, commit with `docs: ...` prefix
 6. **PR**: Use `beaver-pr` skill, or push and `gh pr create`
 
-## Writing Guidelines
-
-- **Language**: All content in Chinese (中文)
-- **Frontmatter**: Minimal — typically just `title`
-- **File naming**: `kebab-case.md`; use `YYYY-MM-DD-slug.md` for dated articles, `NNNN-slug.md` for RFCs
-- **Style**: Match existing articles in the same section — read one first. No fixed template; adapt structure to the content.
-- **Code blocks**: Always specify a language tag (use `text` for diagrams/pseudocode)
-
-For detailed lint rules and sidebar config patterns, read `references/conventions.md`.
+Before writing, read `references/conventions.md` for content and formatting rules.

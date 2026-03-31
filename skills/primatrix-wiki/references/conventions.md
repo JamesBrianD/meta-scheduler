@@ -1,5 +1,12 @@
 # Wiki Conventions
 
+## Writing
+
+- **Language**: All content in Chinese (中文)
+- **Frontmatter**: Minimal — typically just `title`
+- **File naming**: `kebab-case.md`; use `YYYY-MM-DD-slug.md` for dated articles, `NNNN-slug.md` for RFCs
+- **Style**: Match existing articles in the same section — read one first. No fixed template; adapt structure to the content.
+
 ## Sidebar Config (`docs/.vitepress/config.ts`)
 
 Every new page must have a sidebar entry. Find the matching section key and add an item:
