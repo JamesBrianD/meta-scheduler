@@ -1,190 +1,58 @@
 ---
 name: primatrix-wiki
-description: Create or edit wiki articles in the primatrix/wiki VitePress site. Trigger when user wants to write documentation, add reference articles, update wiki pages, or submit wiki-related PRs.
+description: Read, create, or edit articles in the primatrix/wiki VitePress site. Use when the user wants to write documentation, look up wiki content, add reference articles, update existing pages, or submit wiki PRs. Trigger on mentions of "wiki", "文档", "写一篇", "查一下wiki", or any primatrix/wiki related task.
 ---
 
-# Edit Wiki
+# Primatrix Wiki
 
-Create or edit articles in the internal wiki (primatrix/wiki), a VitePress static site hosted on Cloudflare Pages. Handles the full workflow: branch creation, article writing, sidebar config update, lint, commit, and PR submission.
+Internal wiki at `primatrix/wiki`, a VitePress site deployed on Cloudflare Pages.
 
-## Prerequisites
+**Repo**: `/Users/ramezes/job/wiki` — all operations run from this directory.
 
-- Working directory is `/Users/ramezes/job/wiki` (or can cd there)
-- `gh auth status` must succeed
-- Wiki repo remote: `https://github.com/primatrix/wiki.git`
+## Before Acting
 
-## Wiki Site Structure
-
-```text
-docs/
-├── .vitepress/config.ts    ← Sidebar navigation config (MUST update for new pages)
-├── index.md                ← Home page (layout: home)
-├── projects/
-│   ├── sglang-jax/         ← sglang-jax project docs
-│   │   ├── index.md
-│   │   └── reference/      ← Reference/research articles
-│   ├── performance-optimization/
-│   └── ling-alignment/
-├── rfc/                    ← RFC documents
-├── best-practices/         ← Coding standards, reviews
-├── onboarding/             ← New member guides
-└── summaries/              ← Meeting summaries (no sidebar entry)
-```
-
-## Content Conventions
-
-- **Language**: All content in **Chinese (中文)**
-- **Frontmatter**: Minimal — just `title` field for standard articles
-
-  ```yaml
-  ---
-  title: 文章标题
-  ---
-  ```
-
-- **File naming**: kebab-case, e.g., `sglang-kv-cache-offload.md`
-- **Date-prefixed**: Use `YYYY-MM-DD-slug.md` for dated articles
-- **RFC format**: `NNNN-slug.md` with extended frontmatter (status, author, date, reviewers)
-
-## Workflow
-
-### 1. Create branch
+Discover the wiki's current structure and available sections:
 
 ```bash
-git checkout -b docs/<descriptive-slug>
+# Sections and projects
+ls docs/projects/ docs/
+# Sidebar navigation structure
+cat docs/.vitepress/config.ts
+# Existing articles in a section
+find docs/<section>/ -name "*.md"
 ```
 
-### 2. Research (if needed)
+## Decision Flow
 
-If the article requires codebase research, use Explore agents to gather information before writing. Parallelize where possible.
+1. **User wants to find or read content?**
+   - Search: `grep -r "keyword" docs/ --include="*.md" -l`
+   - Read the matched article(s) and summarize for the user
 
-### 3. Write the article
+2. **User wants to create a new article?**
+   - Ask or infer: which section/project does it belong to?
+   - Read 1-2 existing articles in that section to match the local style
+   - Follow the **New Article Workflow** below
 
-Create the `.md` file in the appropriate `docs/` subdirectory.
+3. **User wants to edit an existing article?**
+   - Locate the file, read it, make changes
+   - Run lint: `npx markdownlint-cli2 docs/path/to/article.md`
+   - Commit and push (or PR via `beaver-pr`)
 
-**Article structure guidelines**:
+## New Article Workflow
 
-- Start with an H1 matching the frontmatter title
-- Use a blockquote `>` for the article summary/scope
-- Use `---` horizontal rules to separate major sections
-- Use Chinese section numbering: 一、二、三… for top-level sections
-- Use tables for structured comparisons
-- Use fenced code blocks with language tags (e.g., ` ```python `, ` ```text ` for diagrams)
-- Add blank lines before and after lists (markdownlint MD032)
+1. **Branch**: `git checkout -b docs/<descriptive-slug>`
+2. **Write**: Create `.md` in the appropriate `docs/` subdirectory
+3. **Sidebar**: Add entry to `docs/.vitepress/config.ts` — every new page needs one, or it won't appear in navigation. See `references/conventions.md` for link format.
+4. **Lint**: `npx markdownlint-cli2 docs/path/to/article.md` — see `references/conventions.md` for rules
+5. **Commit**: Stage article + config.ts, commit with `docs: ...` prefix
+6. **PR**: Use `beaver-pr` skill, or push and `gh pr create`
 
-**Reference article pattern** (for research/analysis docs):
+## Writing Guidelines
 
-```markdown
----
-title: 参考：Topic Name
----
+- **Language**: All content in Chinese (中文)
+- **Frontmatter**: Minimal — typically just `title`
+- **File naming**: `kebab-case.md`; use `YYYY-MM-DD-slug.md` for dated articles, `NNNN-slug.md` for RFCs
+- **Style**: Match existing articles in the same section — read one first. No fixed template; adapt structure to the content.
+- **Code blocks**: Always specify a language tag (use `text` for diagrams/pseudocode)
 
-# 参考：Full Title
-
-> 一句话描述本文的来源、目的和受众。
-
----
-
-## 一、总览
-## 二、核心架构
-## 三、详细分析
-...
-## N、参考文件索引
-```
-
-### 4. Update sidebar config
-
-**CRITICAL**: Every new page MUST be added to `docs/.vitepress/config.ts` sidebar, otherwise it won't appear in navigation.
-
-Open `docs/.vitepress/config.ts`, find the matching section key (e.g., `'/projects/sglang-jax/'`), and add an entry:
-
-```typescript
-{ text: '文章标题', link: '/projects/sglang-jax/reference/article-slug' }
-```
-
-Rules:
-
-- Links **omit** the `.md` extension and the `docs/` prefix
-- Place the entry at the appropriate nesting level
-- Use `collapsed: false` for sub-groups that should be expanded by default
-
-### 5. Lint
-
-Run markdownlint before committing:
-
-```bash
-npx markdownlint-cli2 docs/path/to/article.md
-```
-
-The pre-commit hook also runs `markdownlint-cli2` on all staged `docs/**/*.md` files automatically.
-
-**Key lint rules** (disabled rules you DON'T need to worry about):
-
-- MD013 (line length): disabled
-- MD033 (inline HTML): disabled
-- MD025 (single H1): disabled
-- MD026 (trailing punctuation): disabled
-- MD060 (table alignment): disabled
-
-**Rules you MUST follow**:
-
-- MD040: Fenced code blocks MUST have a language specified (use `text` for diagrams/pseudocode)
-- MD032: Lists MUST be surrounded by blank lines
-- MD029: Ordered list items use `1.` prefix within each sub-section (not continuous numbering across sections)
-
-### 6. Commit
-
-Stage both the article and config.ts (if modified):
-
-```bash
-git add docs/path/to/article.md docs/.vitepress/config.ts
-git commit -m "docs: brief description of the article"
-```
-
-### 7. Push and create PR
-
-Use `beaver-pr` skill if available, or:
-
-```bash
-git push -u origin docs/<branch-name>
-gh pr create --title "docs: PR title" --body "$(cat <<'EOF'
-## Summary
-- Bullet points describing the changes
-
-## Files
-- `docs/path/to/article.md` — Article description
-EOF
-)"
-```
-
-### 8. Address review comments
-
-After PR creation, automated reviewers (CodeRabbit, Gemini) may leave comments. Fetch and address them:
-
-```bash
-# Fetch PR review comments
-gh api repos/primatrix/wiki/pulls/<PR_NUMBER>/comments
-
-# Fetch PR general comments
-gh pr view <PR_NUMBER> --json comments
-```
-
-Fix issues, commit, and push. Common review feedback:
-
-- Inconsistent terminology or defaults
-- Chinese grammar/wording improvements
-- Outdated API claims (verify against current docs)
-
-## Quick Reference
-
-| Item | Value |
-|------|-------|
-| Repo | `primatrix/wiki` |
-| Framework | VitePress 1.6.4 |
-| Sidebar config | `docs/.vitepress/config.ts` |
-| Lint tool | `markdownlint-cli2` |
-| Lint config | `.markdownlint.yaml` |
-| Git hooks | Husky + lint-staged (pre-commit) |
-| Deploy | Cloudflare Pages (auto on push) |
-| Content language | Chinese (中文) |
-| File naming | kebab-case, `.md` extension |
+For detailed lint rules and sidebar config patterns, read `references/conventions.md`.
