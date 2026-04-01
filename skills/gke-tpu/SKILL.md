@@ -1,6 +1,6 @@
 ---
 name: gke-tpu
-description: Manage GKE-based TPU workloads — provision clusters via xpk, sync code, run multi-process benchmarks, profile Pallas kernels with xprof LLO, and teardown. Use when the user wants to create/manage/run/profile TPU workloads on GKE. Reads config from .claude/gke.toml.
+description: Manage GKE-based TPU workloads — provision clusters via xpk, sync code, run multi-process benchmarks, and profile Pallas kernels with xprof LLO. Use when the user wants to create/manage/run/profile TPU workloads on GKE. Reads config from .claude/gke.toml.
 argument-hint: "<command> [args...]"
 ---
 
@@ -16,7 +16,6 @@ Manage GKE-based TPU workloads via `xpk`. Config-driven via `.claude/gke.toml`.
 | `sync` | Sync code + install deps to all containers | [references/sync.md](references/sync.md) |
 | `run` | Execute script on multi-process TPU | [references/run.md](references/run.md) |
 | `profile` | Run with xprof LLO profiling | [references/profile.md](references/profile.md) |
-| `teardown` | Delete workload or cluster | [references/teardown.md](references/teardown.md) |
 | `status` | Check pod/workload status | [references/teardown.md](references/teardown.md) |
 
 **Read the relevant reference file for the user's command before executing.**
@@ -27,9 +26,9 @@ Read `.claude/gke.toml` at the start of every command. Never hardcode project/cl
 
 ```toml
 [gke]
-project = "poc-tpu-partner"
-cluster = "tpuv6e-256-node"
-zone = "us-east5"
+project = "<your-gcp-project>"
+cluster = "<your-cluster-name>"
+zone = "<your-zone>"
 
 [tpu]
 type = "v6e-256"

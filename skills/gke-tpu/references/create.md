@@ -1,6 +1,25 @@
-# create — Provision Cluster + Workload
+# create — Provision Cluster and/or Workload
 
-## Step 1: Create Pathways Cluster (one-time, reusable)
+First check what already exists, then only create what's needed.
+
+## Step 1: Check existing state
+
+```bash
+# Check if cluster exists
+gcloud container clusters list --project=<gke.project> --zone=<gke.zone> \
+  --filter="name=<gke.cluster>" --format="value(name)"
+
+# Check existing workloads
+xpk workload list --cluster=<gke.cluster> --zone=<gke.zone> --project=<gke.project>
+```
+
+- **Cluster exists + workload exists** → skip to "Wait for pod ready"
+- **Cluster exists + no workload** → skip to "Create Workload"
+- **No cluster** → start from "Create Cluster"
+
+## Step 2: Create Cluster (skip if already exists)
+
+One-time setup, reusable across workloads.
 
 ```bash
 xpk cluster create-pathways \
@@ -12,7 +31,7 @@ xpk cluster create-pathways \
   --project <gke.project>
 ```
 
-## Step 2: Create Workload
+## Step 3: Create Workload (skip if already exists)
 
 Docker image must match pyproject.toml JAX version (Python >= 3.12).
 
@@ -28,7 +47,6 @@ gcloud artifacts docker images list us-docker.pkg.dev/cloud-tpu-images/jax-ai-im
 | `jax==0.8.1` | `jax0.8.1-rev1` |
 | `jax==0.9.0` | `jax0.9.0-rev1` |
 
-Create workload:
 ```bash
 xpk workload create \
   --workload <workload.name> \
@@ -42,7 +60,7 @@ xpk workload create \
   --command="sleep infinity"
 ```
 
-## Step 3: Wait for pod ready
+## Step 4: Wait for pod ready
 
 ```bash
 kubectl get pods

@@ -1,18 +1,4 @@
-# teardown & status
-
-## teardown
-
-```bash
-# Delete workload only
-xpk workload delete --workload <workload.name> \
-  --cluster=<gke.cluster> --zone=<gke.zone> --project=<gke.project>
-
-# Delete entire cluster (removes all workloads)
-xpk cluster delete --cluster <gke.cluster> \
-  --zone=<gke.zone> --project=<gke.project>
-```
-
-## status
+# status
 
 ```bash
 # List workloads
