@@ -26,3 +26,11 @@ gcloud auth application-default login
 ```bash
 gcloud container clusters get-credentials <gke.cluster> --zone=<gke.zone> --project=<gke.project>
 ```
+
+## Proxy (if needed)
+
+If gcloud/kubectl timeout, set proxy:
+
+```bash
+export https_proxy=http://127.0.0.1:7890
+```

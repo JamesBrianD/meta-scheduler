@@ -33,6 +33,9 @@ zone = "<your-zone>"
 accelerator = "tpu-v6e-slice"   # nodeSelector accelerator label
 topology = "4x4"                # TPU topology (determines chip count)
 chips_per_node = 4              # google.com/tpu resource per container
+machine_type = "ct6e-standard-4t"  # GKE machine type
+max_nodes = 4                   # autoscaling max for node pool
+reservation = ""                # optional: reservation name for reserved capacity
 
 [workload]
 name = "my-workload"
@@ -78,6 +81,8 @@ gcs_bucket = "gs://bucket/profile_tmp"
 3. **Simultaneous launch**: For multi-host, `jax.distributed.initialize()` must run in all pods at the same time.
 4. **Same code path**: ALL processes must execute the SAME jitted computations.
 5. **Docker image must match JAX version** in pyproject.toml.
+6. **Reservations**: If `tpu.reservation` is set, use `--reservation-affinity=specific` with fixed node count (no autoscaling).
+7. **Multi-host verification**: `import jax` blocks on multi-host TPU. Use `/dev/vfio/` for per-pod hardware check, `run` command for full JAX cluster verification.
 
 ## Prerequisites
 
