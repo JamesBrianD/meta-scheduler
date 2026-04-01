@@ -1,71 +1,157 @@
-# create — Provision Cluster and/or Workload
+# create — Create TPU Workload
 
-First check what already exists, then only create what's needed.
+Determine single-host vs multi-host from topology, then apply the correct YAML template.
 
-## Step 1: Check existing state
-
-```bash
-# Check if cluster exists
-gcloud container clusters list --project=<gke.project> --zone=<gke.zone> \
-  --filter="name=<gke.cluster>" --format="value(name)"
-
-# Check existing workloads
-xpk workload list --cluster=<gke.cluster> --zone=<gke.zone> --project=<gke.project>
-```
-
-- **Cluster exists + workload exists** → skip to "Wait for pod ready"
-- **Cluster exists + no workload** → skip to "Create Workload"
-- **No cluster** → start from "Create Cluster"
-
-## Step 2: Create Cluster (skip if already exists)
-
-One-time setup, reusable across workloads.
+## Step 1: Connect to cluster
 
 ```bash
-# Add --spot if tpu.spot = true
-xpk cluster create-pathways \
-  --cluster <gke.cluster> \
-  --num-slices=<tpu.num_slices> \
-  --tpu-type=<tpu.type> \
-  --zone=<gke.zone> \
-  --spot \
-  --project <gke.project>
+gcloud container clusters get-credentials <gke.cluster> --zone=<gke.zone> --project=<gke.project>
 ```
 
-## Step 3: Create Workload (skip if already exists)
+## Step 2: Choose template
 
-Docker image must match pyproject.toml JAX version (Python >= 3.12).
+Calculate hosts: total chips in topology / `tpu.chips_per_node`.
+- **1 host** → Single-host Pod template
+- **>1 hosts** → Multi-host Job template (requires headless Service)
 
-Check available tags:
+## Single-host Pod Template
+
+For topologies with 1 host (e.g. `2x2` with 4 chips on v6e).
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: <workload.name>
+  annotations:
+    gke-gcsfuse/volumes: "true"
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    cloud.google.com/gke-tpu-accelerator: <tpu.accelerator>
+    cloud.google.com/gke-tpu-topology: <tpu.topology>
+  containers:
+  - name: <workload.name>
+    image: <workload.docker_image>
+    command: ["sleep", "infinity"]
+    resources:
+      requests:
+        google.com/tpu: <tpu.chips_per_node>
+      limits:
+        google.com/tpu: <tpu.chips_per_node>
+    volumeMounts:
+    - name: gcs-fuse-csi-ephemeral
+      mountPath: <storage.mount_path>
+      readOnly: false
+    - name: dev-shm
+      mountPath: /dev/shm
+  serviceAccountName: <workload.service_account>
+  volumes:
+  - name: dev-shm
+    emptyDir:
+      medium: Memory
+  - name: gke-gcsfuse-cache
+    emptyDir:
+      medium: Memory
+  - name: gcs-fuse-csi-ephemeral
+    csi:
+      driver: gcsfuse.csi.storage.gke.io
+      readOnly: false
+      volumeAttributes:
+        skipCSIBucketAccessCheck: "true"
+        gcsfuseMetadataPrefetchOnMount: "true"
+        bucketName: <storage.bucket>
+        mountOptions: "<storage.mount_options>"
+```
+
+## Multi-host Job Template
+
+For topologies with >1 host (e.g. `4x4` = 16 chips = 4 hosts on v6e).
+
+Requires a headless Service for inter-host communication. `parallelism` and `completions` = number of hosts.
+
+```yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: <workload.name>-headless-svc
+spec:
+  clusterIP: None
+  selector:
+    job-name: <workload.name>
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: <workload.name>
+spec:
+  completionMode: Indexed
+  parallelism: <num_hosts>
+  completions: <num_hosts>
+  backoffLimit: 0
+  template:
+    metadata:
+      annotations:
+        gke-gcsfuse/volumes: "true"
+    spec:
+      subdomain: <workload.name>-headless-svc
+      restartPolicy: Never
+      nodeSelector:
+        cloud.google.com/gke-tpu-accelerator: <tpu.accelerator>
+        cloud.google.com/gke-tpu-topology: <tpu.topology>
+      containers:
+      - name: <workload.name>
+        image: <workload.docker_image>
+        command: ["sleep", "infinity"]
+        resources:
+          requests:
+            google.com/tpu: <tpu.chips_per_node>
+          limits:
+            google.com/tpu: <tpu.chips_per_node>
+        volumeMounts:
+        - name: gcs-fuse-csi-ephemeral
+          mountPath: <storage.mount_path>
+          readOnly: false
+        - name: dev-shm
+          mountPath: /dev/shm
+      serviceAccountName: <workload.service_account>
+      volumes:
+      - name: dev-shm
+        emptyDir:
+          medium: Memory
+      - name: gke-gcsfuse-cache
+        emptyDir:
+          medium: Memory
+      - name: gcs-fuse-csi-ephemeral
+        csi:
+          driver: gcsfuse.csi.storage.gke.io
+          readOnly: false
+          volumeAttributes:
+            skipCSIBucketAccessCheck: "true"
+            gcsfuseMetadataPrefetchOnMount: "true"
+            bucketName: <storage.bucket>
+            mountOptions: "<storage.mount_options>"
+```
+
+## Step 3: Apply and wait
+
 ```bash
-gcloud artifacts docker images list us-docker.pkg.dev/cloud-tpu-images/jax-ai-image/tpu \
-  --include-tags --format="value(tags)" --project=<gke.project> \
-  | tr ',' '\n' | grep -E "^jax" | sort -V
+kubectl apply -f /tmp/<workload.name>.yaml
+
+# For Pod:
+kubectl wait --for=condition=Ready pod/<workload.name> --timeout=300s
+
+# For Job:
+kubectl get pods -l job-name=<workload.name> --watch
 ```
 
-| pyproject.toml JAX | Docker image tag |
-|---|---|
-| `jax==0.8.1` | `jax0.8.1-rev1` |
-| `jax==0.9.0` | `jax0.9.0-rev1` |
+## Step 4: Verify
 
 ```bash
-xpk workload create \
-  --workload <workload.name> \
-  --num-slices=<tpu.num_slices> \
-  --tpu-type=<tpu.type> \
-  --cluster=<gke.cluster> \
-  --zone=<gke.zone> \
-  --project=<gke.project> \
-  --docker-name='<workload.name>' \
-  --docker-image="<workload.docker_image>" \
-  --command="sleep infinity"
+# List containers
+kubectl get pod <POD_NAME> -o jsonpath='{.spec.containers[*].name}'
+
+# Check TPU devices
+kubectl exec <POD_NAME> -c <container> -- python3 -c "import jax; print('TPU devices:', jax.device_count())"
 ```
-
-## Step 4: Wait for pod ready
-
-```bash
-kubectl get pods
-kubectl wait --for=condition=Ready pod/<POD_NAME> --timeout=300s
-```
-
-Determine container names: `kubectl get pod <POD> -o jsonpath='{.spec.containers[*].name}'`
