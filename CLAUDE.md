@@ -48,6 +48,20 @@ This eliminates multi-layer shell escaping. The `ms` client sends `ms-agent run 
 - `ms-agent` outputs JSON to stdout for `agentExec` parsing
 - Env vars are passed inline as `--env-json` to each agent call
 
+## Private submodule
+
+`private/` is a git submodule pointing to `JamesBrianD/private-notes` (private repo). It contains personal work context that should not be public:
+
+```
+private/
+├── codewiki/              # Research & analysis docs (mimo-v2-flash, dp-attention, etc.)
+├── specs/                 # Design specs
+├── plans/                 # Implementation plans
+└── work/                  # Personal reflections & priorities
+```
+
+After cloning, run `git submodule update --init` to pull private content.
+
 ## Key files
 
 - `src/cli.ts` — Client CLI entry point (commander.js)
