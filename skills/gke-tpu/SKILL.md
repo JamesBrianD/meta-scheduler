@@ -1,7 +1,6 @@
 ---
 name: gke-tpu
 description: Manage GKE-based TPU workloads — provision clusters via xpk, sync code, run multi-process benchmarks, and profile Pallas kernels with xprof LLO. Use when the user wants to create/manage/run/profile TPU workloads on GKE. Reads config from .claude/gke.toml.
-argument-hint: "<command> [args...]"
 ---
 
 # GKE TPU Skill
