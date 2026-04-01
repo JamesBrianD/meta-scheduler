@@ -22,12 +22,13 @@ xpk workload list --cluster=<gke.cluster> --zone=<gke.zone> --project=<gke.proje
 One-time setup, reusable across workloads.
 
 ```bash
+# Add --spot if tpu.spot = true
 xpk cluster create-pathways \
   --cluster <gke.cluster> \
   --num-slices=<tpu.num_slices> \
   --tpu-type=<tpu.type> \
   --zone=<gke.zone> \
-  --spot \                          # if tpu.spot = true
+  --spot \
   --project <gke.project>
 ```
 

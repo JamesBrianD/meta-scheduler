@@ -61,7 +61,7 @@ Use GCS — `kubectl cp` truncates files > 50 MB.
 ```bash
 # Upload from pod
 kubectl exec $POD -c <first container> -- bash -c '
-TRACE_DIR=$(find /tmp/profile_output -name "*.xplane.pb" -exec dirname {} \;)
+TRACE_DIR=$(find /tmp/profile_output -name "*.xplane.pb" -exec dirname {} \; | head -n 1)
 gsutil cp ${TRACE_DIR}/*.xplane.pb <profile.gcs_bucket>/
 gsutil cp ${TRACE_DIR}/*.trace.json.gz <profile.gcs_bucket>/
 '

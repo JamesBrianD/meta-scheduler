@@ -7,7 +7,8 @@ All commands must run on ALL containers (multi-process TPU pods have independent
 ```bash
 for CONTAINER in <all containers>; do
   kubectl exec <POD_NAME> -c $CONTAINER -- bash -c '
-    cd /tmp && git clone --depth 1 <repo.git_url>
+    cd /tmp
+    if [ ! -d "<repo_name>" ]; then git clone --depth 1 <repo.git_url>; fi
     cd <repo_name>/<repo.python_subdir> && <repo.install_cmd>
   '
 done
