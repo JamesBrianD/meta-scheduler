@@ -50,11 +50,8 @@ mount_options = "implicit-dirs,file-cache:max-parallel-downloads:256,file-cache:
 [repo]
 git_url = "https://github.com/sgl-project/sglang-jax.git"
 remote_path = "/tmp/sglang-jax"
-python_subdir = "python"
-install_cmd = "pip install --no-deps -e ."
-
-[repo.deps]
-packages = ["pyzmq", "fastapi", "..."]
+install_cmd = "pip install -e ."            # run in repo root
+# requirements_file = "requirements-tpu.txt"  # optional: extra deps file (relative to repo root)
 
 [profile]
 gcs_bucket = "gs://bucket/profile_tmp"

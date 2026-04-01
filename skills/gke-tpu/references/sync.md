@@ -66,14 +66,17 @@ done
 ## Install dependencies (after either mode)
 
 ```bash
-# Install repo package
 for POD in $PODS; do
   kubectl exec $POD -c <workload.name> -- bash -c \
-    'cd <repo.remote_path>/<repo.python_subdir> && <repo.install_cmd>'
+    'cd <repo.remote_path> && <repo.install_cmd>'
 done
+```
 
-# Install runtime deps
+If `repo.requirements_file` is set:
+
+```bash
 for POD in $PODS; do
-  kubectl exec $POD -c <workload.name> -- pip install <repo.deps.packages joined by space>
+  kubectl exec $POD -c <workload.name> -- bash -c \
+    'cd <repo.remote_path> && pip install -r <repo.requirements_file>'
 done
 ```
