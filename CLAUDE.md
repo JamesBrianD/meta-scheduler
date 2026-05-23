@@ -1,103 +1,60 @@
 # Meta-Scheduler
 
-CLI tool for managing multiple Claude Code instances across remote workers (SSH, K8s, local).
+Infrastructure for managing **persistent Claude Code agents** — long-running CC processes that live across time, each anchored to a directory in a *vault*, with their own tasks and memory.
 
-## Build
+> **Status: redesign transition.** The original two-binary remote-dispatch implementation (`ms` / `ms-agent` over SSH/k8s) is being deleted. Most of `src/` is currently dead code awaiting removal. See `private/specs/2026-05-24-meta-scheduler-redesign.md` for the new model and `private/agents/meta-scheduler-dev/notes/cleanup-targets.md` for what's on the chopping block.
 
-```bash
-npm install
-npm run build
-```
+## What this is
 
-## Install CLI globally
+A persistent agent is a CC process bound to its own directory. It reads `AGENTS.md` to learn its role, pulls tasks from its own `inbox/`, executes, writes results to `notes/` and `log/`, and self-loops via `ScheduleWakeup` or `/loop`.
 
-```bash
-npm run build && npm link
-```
+The **vault** is the file-system layout that holds those agent directories. The vault is the contract; the rest of this repo is the surrounding infrastructure (boot scaffolding, supervisor, dashboard) that makes operating a fleet of agents practical.
 
-Both `ms` and `ms-agent` commands are now available globally.
-
-## Architecture
-
-Two-binary design:
-
-- **`ms`** (client CLI) — runs locally, manages state in SQLite, sends structured commands to workers
-- **`ms-agent`** (worker agent) — deployed on each worker, handles tmux/claude operations locally
-
-```
-ms (local) ──SSH/kubectl──> ms-agent (worker)
-                              ├── tmux session management
-                              ├── claude binary discovery
-                              ├── log file reading
-                              └── slot status reporting
-```
-
-This eliminates multi-layer shell escaping. The `ms` client sends `ms-agent run --id X --prompt Y` via the connector, and `ms-agent` handles everything locally with only one shell boundary.
-
-- **ESM project** — `"type": "module"` in package.json, `module: "NodeNext"` in tsconfig
-- **esbuild** bundles two entry points: `dist/cli.js` (ms) and `dist/agent-cli.js` (ms-agent)
-- **better-sqlite3** is external for `ms` only (native addon). `ms-agent` has no native deps.
-- **SQLite** at `~/.meta-scheduler/meta-scheduler.db` — all state stored here (client-side only)
-- **Connectors** abstract SSH/local/K8s transport with `agentExec()`/`agentInteractive()` for structured agent calls
-
-## Conventions
-
-- All imports use `.js` extension (NodeNext module resolution)
-- `better-sqlite3` calls are synchronous; connector calls are async
-- IDs are 8-char UUID prefixes via `generateId()`
-- `ms-agent` outputs JSON to stdout for `agentExec` parsing
-- Env vars are passed inline as `--env-json` to each agent call
-
-## Private submodule
-
-`private/` is a git submodule pointing to `JamesBrianD/private-notes` (private repo). It contains personal work context that should not be public:
+## Vault layout
 
 ```
 private/
-├── codewiki/              # Research & analysis docs (mimo-v2-flash, dp-attention, etc.)
-├── specs/                 # Design specs
-├── plans/                 # Implementation plans
-└── work/                  # Personal reflections & priorities
+├── agents/
+│   ├── meta-scheduler-dev/      # First agent (v1; dogfoods this redesign)
+│   │   ├── AGENTS.md             # Identity & work loop
+│   │   ├── inbox/                # Pending tasks (one .md per task)
+│   │   ├── doing/                # In-progress tasks
+│   │   ├── done/                 # Completed tasks
+│   │   ├── log/                  # Auto-written work log (per-day)
+│   │   └── notes/                # Long-term memory (agent-curated)
+│   └── <future-agents>/          # sgl-jax-main, tpu-profiler, chief-of-staff, …
+└── work/                         # Public cross-agent area (not auto-loaded)
+    ├── codewiki/  specs/  plans/  daily/
 ```
 
-After cloning, run `git submodule update --init` to pull private content.
+Every agent has the same five subdirs (`inbox/ doing/ done/ log/ notes/`). Tasks move through `inbox → doing → done` as markdown files; the operator (or another agent) injects work by dropping files into `inbox/`.
 
-## Key files
+## Public vs private split
 
-- `src/cli.ts` — Client CLI entry point (commander.js)
-- `src/db.ts` — SQLite singleton and schema
-- `src/connectors/connector.ts` — Connector interface, factory, agentExec/agentInteractive
-- `src/models/worker.ts` — Worker CRUD
-- `src/models/slot.ts` — Thin client slot lifecycle (delegates to agent)
-- `src/agent/agent-cli.ts` — Worker agent CLI entry point
-- `src/agent/slot-manager.ts` — Agent-side tmux/claude/log operations
+This repo is intended for open-source release once v2 ships. The boundary is enforced by the existing submodule:
 
-## Deploying ms-agent to workers
+- **`meta-scheduler/`** (public, this repo): infrastructure code — vault schema, agent boot scaffolding, future supervisor and dashboard, conventions documented here. No personal content.
+- **`meta-scheduler/private/`** (private submodule, `JamesBrianD/private-notes`): vault contents — agent identities, notes, in-progress tasks. Never committed to the public repo.
 
-```bash
-# Local worker: npm link handles it
-ms worker add local-dev --type local
+After cloning, run `git submodule update --init` to pull private content. Anyone adopting the public project plugs in their own private vault under `private/`.
 
-# SSH worker: deploy the binary
-ms worker add dev-vm --type ssh --host 10.0.1.5 --user dev
-ms worker setup dev-vm
+## Skills
 
-# K8s worker: deploy the binary
-ms worker add k8s-pod --type k8s --pod my-pod --namespace default
-ms worker setup k8s-pod
-```
+`skills/` (e.g. `gke-tpu`, `sync`) are independent CC skills that pre-date the redesign and remain useful. They are not part of the agent-vault model and stay as-is.
 
-## Testing
+## Roadmap
 
-No automated tests yet. Test manually:
+- **v1 — validate the model.** Bootstrap a single agent (`meta-scheduler-dev`) whose first job is to help build v2 by dogfooding the persistent-agent + vault primitive. Manual task injection via filesystem; no dashboard, no supervisor. *We are here.*
+- **v2 — make it usable.** A *supervisor* (detects hung CC processes, restarts on network recovery) and a *dashboard* (web/Mac app reading vault state — per-agent status, inbox depth, last activity, copy-to-clipboard `claude --resume` command). A second agent to validate isolation between agents.
+- **v3 — delegation & remote control.** A *Chief of Staff* agent with permission to write into other agents' inboxes (just another agent — no special infra). Feishu integration via existing `cc-connect` so the operator can triage from mobile; the master agent delegates to specialists.
 
-```bash
-ms worker add local-dev --type local
-ms worker list
-ms run "echo hello" --worker local-dev --path /tmp
-ms list
-ms logs <slot-id>
-ms attach <slot-id>
-ms kill <slot-id>
-ms worker remove local-dev
-```
+## What this replaces (history note)
+
+Earlier iterations of this repo shipped `ms` (a local CLI) and `ms-agent` (a worker-side binary deployed via SSH/k8s) — a remote-dispatch design where the operator dispatched tasks to CC processes running on remote machines. That abstraction was wrong: the meaningful axis is *time* (agents that own goals and memory across sessions), not *space* (where the process happens to run). CC's own primitives (`/loop`, `ScheduleWakeup`, durable threads) already cover the temporal axis, so the remote-dispatch layer is being deleted in favor of the local-vault model described above.
+
+## Working in this repo
+
+- The codebase is mid-transition: don't add code on top of `src/connectors/`, `src/agent/`, `src/models/{worker,slot,env,task}.ts`, or `src/dispatcher.ts`. They are slated for deletion.
+- New work belongs in `private/agents/<name>/` (vault content) or — once v2 starts — in fresh public modules for the supervisor and dashboard.
+- See `HOW-TO-BOOT.md` (in the `meta-scheduler-dev` agent home) for booting an agent in a terminal.
+- See `private/specs/2026-05-24-meta-scheduler-redesign.md` for the full design rationale and open questions.
