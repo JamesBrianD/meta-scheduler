@@ -1,7 +1,11 @@
+import { execFile } from "node:child_process";
 import { appendFile } from "node:fs/promises";
+import { promisify } from "node:util";
 import type { AgentRuntime, AgentState, RestartRecord } from "./types.ts";
 import { agentRestartLog, ensureAgentDir } from "./heartbeat.ts";
 import { hasSession, killSession, panePid, startSession, tmuxSessionName } from "./tmux.ts";
+
+const execFileAsync = promisify(execFile);
 
 const BACKOFF_MS = [60_000, 5 * 60_000, 15 * 60_000, 60 * 60_000];
 const CIRCUIT_WINDOW_MS = 10 * 60_000;
@@ -40,9 +44,22 @@ function pruneRecent(times: number[], now: number): number[] {
 }
 
 export interface RestartDecision {
-  action: "skip" | "wait-backoff" | "wait-circuit" | "wait-network" | "no-session" | "go";
+  action: "skip" | "wait-backoff" | "wait-circuit" | "wait-network" | "no-session" | "external-process" | "go";
   reason: string;
   waitMs?: number;
+}
+
+async function externalHoldersOf(sessionFile: string, ownPid: number | null): Promise<number[]> {
+  try {
+    const { stdout } = await execFileAsync("lsof", ["-t", sessionFile], { encoding: "utf8" });
+    const pids = stdout
+      .split("\n")
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => Number.isFinite(n));
+    return ownPid != null ? pids.filter((p) => p !== ownPid) : pids;
+  } catch {
+    return [];
+  }
 }
 
 export function shouldRestart(
@@ -107,6 +124,15 @@ export async function performRestart(agent: AgentState): Promise<{
     };
   }
   const prevPid = agent.runtime.pid;
+
+  if (agent.sessionFile) {
+    const others = await externalHoldersOf(agent.sessionFile, prevPid);
+    if (others.length > 0) {
+      const detail = `refused: external pid(s) ${others.join(",")} hold ${agent.sessionFile} — operator booted outside supervisor convention`;
+      await logRestart(agentName, { at: Date.now(), reason: "hang detected", ok: false, detail });
+      return { ok: false, detail, runtime: { ...agent.runtime } };
+    }
+  }
 
   if (await hasSession(session)) {
     await killSession(session);
