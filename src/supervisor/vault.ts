@@ -1,7 +1,7 @@
 import { readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import type { AgentState, AgentStatus } from "./types.ts";
+import type { AgentState, AgentStatus, TaskFile } from "./types.ts";
 
 const SUSPICIOUS_AGE_MS = 120_000;
 const HANG_AGE_MS = 3_000_000;
@@ -26,13 +26,22 @@ async function isFile(p: string): Promise<boolean> {
   }
 }
 
-async function countMd(dir: string): Promise<number> {
+async function listMd(dir: string): Promise<TaskFile[]> {
   try {
     const entries = await readdir(dir);
-    return entries.filter((f) => f.endsWith(".md")).length;
+    return entries
+      .filter((f) => f.endsWith(".md") && !f.startsWith("."))
+      .sort()
+      .map((filename) => ({ filename, prettyName: prettifyTaskName(filename) }));
   } catch {
-    return 0;
+    return [];
   }
+}
+
+function prettifyTaskName(filename: string): string {
+  let stem = filename.replace(/\.md$/, "");
+  stem = stem.replace(/^\d+[-_]/, "");
+  return stem.replace(/[-_]/g, " ");
 }
 
 async function findLiveSession(agentHome: string): Promise<{ id: string; file: string; mtimeMs: number } | null> {
@@ -87,10 +96,10 @@ export async function readVault(vaultDir: string): Promise<AgentState[]> {
     if (!(await isDir(home))) continue;
 
     const hasIdentity = await isFile(join(home, "AGENTS.md"));
-    const [inboxCount, doingCount, doneCount] = await Promise.all([
-      countMd(join(home, "inbox")),
-      countMd(join(home, "doing")),
-      countMd(join(home, "done")),
+    const [inboxTasks, doingTasks, doneTasks] = await Promise.all([
+      listMd(join(home, "inbox")),
+      listMd(join(home, "doing")),
+      listMd(join(home, "done")),
     ]);
 
     const session = await findLiveSession(home);
@@ -100,9 +109,11 @@ export async function readVault(vaultDir: string): Promise<AgentState[]> {
       name,
       home,
       hasIdentity,
-      inboxCount,
-      doingCount,
-      doneCount,
+      inboxCount: inboxTasks.length,
+      doingCount: doingTasks.length,
+      doneCount: doneTasks.length,
+      doingTasks,
+      inboxTasks,
       sessionId: session?.id ?? null,
       sessionFile: session?.file ?? null,
       lastActivityMs,

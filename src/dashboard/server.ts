@@ -88,7 +88,8 @@ export function startServer(opts: ServerOpts) {
         if (!agent) return notFound(res);
 
         if (method === "GET" && !sub) {
-          return html(res, 200, renderDetail(state, agent));
+          const dropped = url.searchParams.get("dropped");
+          return html(res, 200, renderDetail(state, agent, dropped));
         }
         if (method === "GET" && sub === "tail") {
           if (!agent.sessionFile) return text(res, 409, "no session file yet");
@@ -103,7 +104,8 @@ export function startServer(opts: ServerOpts) {
           const filename = params.get("filename") ?? "";
           const content = params.get("content") ?? "";
           const { path } = await dropTask(agent.home, filename, content);
-          res.writeHead(303, { Location: `/agent/${encodeURIComponent(name)}?dropped=${encodeURIComponent(path)}` });
+          const droppedName = path.split("/").pop() ?? path;
+          res.writeHead(303, { Location: `/agent/${encodeURIComponent(name)}?dropped=${encodeURIComponent(droppedName)}` });
           res.end();
           return;
         }
