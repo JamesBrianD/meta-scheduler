@@ -1,9 +1,14 @@
 {
   "name": "meta-scheduler",
   "version": "0.2.0-pre",
-  "description": "Persistent-agent + vault scaffolding for Claude Code. Currently ships only the vault layout (private/) and skills/; v2 supervisor and dashboard land here later.",
+  "description": "Persistent-agent + vault scaffolding for Claude Code. Ships the vault layout, skills, and a v2 supervisor+dashboard daemon.",
   "type": "module",
+  "bin": {
+    "meta-scheduler": "./bin/meta-scheduler"
+  },
   "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
     "lint": "tsc --noEmit"
   },
   "engines": {
@@ -11,6 +16,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
     "typescript": "^5.8.0"
   }
 }
