@@ -4,6 +4,7 @@ import type { SupervisorState } from "../supervisor/types.ts";
 import { renderDetail } from "./views/detail.ts";
 import { renderList } from "./views/list.ts";
 import { dropTask, InboxError } from "./inbox.ts";
+import { readRestartLog } from "./restart-log.ts";
 import { tailSession } from "./sse.ts";
 
 interface ServerOpts {
@@ -89,7 +90,8 @@ export function startServer(opts: ServerOpts) {
 
         if (method === "GET" && !sub) {
           const dropped = url.searchParams.get("dropped");
-          return html(res, 200, renderDetail(state, agent, dropped));
+          const restarts = await readRestartLog(agent.name);
+          return html(res, 200, renderDetail(state, agent, dropped, restarts));
         }
         if (method === "GET" && sub === "tail") {
           if (!agent.sessionFile) return text(res, 409, "no session file yet");

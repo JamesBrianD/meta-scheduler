@@ -227,6 +227,21 @@ export const STYLES = `
     50%      { opacity: 0.45; }
   }
 
+  .restart-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .restart-list li {
+    display: grid;
+    grid-template-columns: 200px 60px 1fr;
+    gap: 10px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border-soft);
+    align-items: baseline;
+  }
+  .restart-list li:last-child { border-bottom: 0; }
+  .restart-list li .restart-when { color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; }
+  .restart-list li .restart-status { font-weight: 600; }
+  .restart-list li .restart-reason { color: var(--fg-soft); }
+  .restart-list li .restart-detail { grid-column: 3; color: var(--muted); font-size: 11.5px; }
+
   .inbox-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
   .inbox-list li {
     display: flex; align-items: center; gap: 10px;

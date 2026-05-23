@@ -1,4 +1,5 @@
 import type { AgentState, SupervisorState } from "../../supervisor/types.ts";
+import type { RestartLogEntry } from "../restart-log.ts";
 import { escapeHtml, page, relativeAge, statusBadge } from "./layout.ts";
 
 function shellEscape(s: string): string {
@@ -54,7 +55,36 @@ function inboxPanel(agent: AgentState): string {
   `;
 }
 
-export function renderDetail(state: SupervisorState, agent: AgentState, dropped?: string | null): string {
+function restartLogPanel(entries: RestartLogEntry[]): string {
+  if (entries.length === 0) {
+    return `
+      <div class="card">
+        <h2>Restart history</h2>
+        <div style="color: var(--muted); font-size: 13.5px;">No restart events recorded.</div>
+      </div>
+    `;
+  }
+  const items = entries.map((e) => {
+    const color = e.ok ? "var(--ok)" : "var(--bad)";
+    const label = e.ok ? "ok" : "refused";
+    return `
+      <li>
+        <span class="restart-when">${escapeHtml(e.iso)}</span>
+        <span class="restart-status" style="color:${color}">${label}</span>
+        <span class="restart-reason">${escapeHtml(e.reason)}</span>
+        ${e.detail ? `<span class="restart-detail">${escapeHtml(e.detail)}</span>` : ""}
+      </li>
+    `;
+  }).join("");
+  return `
+    <div class="card">
+      <h2>Restart history</h2>
+      <ul class="restart-list">${items}</ul>
+    </div>
+  `;
+}
+
+export function renderDetail(state: SupervisorState, agent: AgentState, dropped: string | null | undefined, restarts: RestartLogEntry[]): string {
   const resumeCmd = agent.sessionId
     ? `cd ${shellEscape(agent.home)} && claude --resume ${agent.sessionId}`
     : `cd ${shellEscape(agent.home)} && claude`;
@@ -91,6 +121,8 @@ export function renderDetail(state: SupervisorState, agent: AgentState, dropped?
           <dt>Restarts</dt><dd>${agent.runtime.restartCount}${agent.runtime.lastRestartAt ? ` <span style="color:var(--muted)">last ${relativeAge(agent.runtime.lastRestartAt)}</span>` : ""}${agent.runtime.circuitOpen ? ' <span style="color:var(--bad)">circuit open</span>' : ""}</dd>
         </dl>
       </div>
+
+      ${restartLogPanel(restarts)}
 
       ${currentTaskPanel(agent)}
 
