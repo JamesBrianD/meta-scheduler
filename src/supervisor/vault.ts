@@ -1,7 +1,8 @@
 import { readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import type { AgentState, AgentStatus, TaskFile } from "./types.ts";
+import type { AgentRuntime, AgentState, AgentStatus, TaskFile } from "./types.ts";
+import { emptyRuntime, refreshRuntime } from "./restart.ts";
 
 const SUSPICIOUS_AGE_MS = 120_000;
 const HANG_AGE_MS = 3_000_000;
@@ -79,7 +80,10 @@ function classify(hasIdentity: boolean, sessionFound: boolean, lastActivityMs: n
   return "healthy";
 }
 
-export async function readVault(vaultDir: string): Promise<AgentState[]> {
+export async function readVault(
+  vaultDir: string,
+  prevRuntime: Map<string, AgentRuntime> = new Map(),
+): Promise<AgentState[]> {
   const root = resolve(vaultDir);
   let names: string[];
   try {
@@ -105,6 +109,8 @@ export async function readVault(vaultDir: string): Promise<AgentState[]> {
     const session = await findLiveSession(home);
     const lastActivityMs = session?.mtimeMs ?? null;
 
+    const runtime = await refreshRuntime(name, prevRuntime.get(name) ?? emptyRuntime());
+
     out.push({
       name,
       home,
@@ -118,6 +124,7 @@ export async function readVault(vaultDir: string): Promise<AgentState[]> {
       sessionFile: session?.file ?? null,
       lastActivityMs,
       status: classify(hasIdentity, !!session, lastActivityMs, now),
+      runtime,
     });
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));

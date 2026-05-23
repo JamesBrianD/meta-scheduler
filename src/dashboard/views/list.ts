@@ -29,6 +29,22 @@ function row(agent: AgentState): string {
   `;
 }
 
+function apiProbeBadge(state: SupervisorState): string {
+  const p = state.apiProbe;
+  const color = p.status === "ok" ? "var(--ok)" : p.status === "down" ? "var(--bad)" : "var(--muted)";
+  const label = p.status === "ok"
+    ? `api ok${p.consecutiveOkMs >= 60_000 ? " · gate open" : ""}`
+    : p.status === "down"
+      ? `api down${p.detail ? ` (${escapeHtml(p.detail)})` : ""}`
+      : "api unknown";
+  return `<span class="heartbeat" style="color:${color}"><span style="width:7px;height:7px;border-radius:50%;background:${color};"></span>${label}</span>`;
+}
+
+function restartBadge(state: SupervisorState): string {
+  const on = state.restartEnabled;
+  return `<span class="heartbeat" style="color:${on ? "var(--accent)" : "var(--muted)"};font-size:11.5px;">restart ${on ? "ENABLED" : "off"}</span>`;
+}
+
 export function renderList(state: SupervisorState): string {
   const heartbeat = state.lastProbeAt && Date.now() - state.lastProbeAt < 60_000
     ? `<span class="heartbeat"><span style="width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent);"></span>supervisor live · probed ${relativeAge(state.lastProbeAt)}</span>`
@@ -43,6 +59,8 @@ export function renderList(state: SupervisorState): string {
       <h1>meta-scheduler</h1>
       <span class="meta">vault <code>${escapeHtml(state.vaultDir)}</code></span>
       <div class="right">
+        ${restartBadge(state)}
+        ${apiProbeBadge(state)}
         ${heartbeat}
         <a href="/api/state">JSON</a>
       </div>

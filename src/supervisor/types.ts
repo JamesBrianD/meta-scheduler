@@ -5,6 +5,23 @@ export interface TaskFile {
   prettyName: string;
 }
 
+export interface RestartRecord {
+  at: number;
+  reason: string;
+  ok: boolean;
+  detail?: string;
+}
+
+export interface AgentRuntime {
+  tmuxSession: string | null;
+  pid: number | null;
+  restartCount: number;
+  lastRestartAt: number | null;
+  recentRestarts: number[];
+  circuitOpen: boolean;
+  circuitOpenedAt: number | null;
+}
+
 export interface AgentState {
   name: string;
   home: string;
@@ -18,6 +35,17 @@ export interface AgentState {
   sessionFile: string | null;
   lastActivityMs: number | null;
   status: AgentStatus;
+  runtime: AgentRuntime;
+}
+
+export type ApiProbeStatus = "ok" | "down" | "unknown";
+
+export interface ApiProbeState {
+  status: ApiProbeStatus;
+  lastOkAt: number | null;
+  lastFailAt: number | null;
+  consecutiveOkMs: number;
+  detail: string | null;
 }
 
 export interface SupervisorState {
@@ -25,4 +53,6 @@ export interface SupervisorState {
   lastProbeAt: number | null;
   vaultDir: string;
   agents: AgentState[];
+  apiProbe: ApiProbeState;
+  restartEnabled: boolean;
 }

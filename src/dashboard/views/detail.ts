@@ -87,6 +87,8 @@ export function renderDetail(state: SupervisorState, agent: AgentState, dropped?
           <dt>Inbox / Doing / Done</dt><dd>${agent.inboxCount} / ${agent.doingCount} / ${agent.doneCount}</dd>
           <dt>Session</dt><dd>${agent.sessionId ? `<code>${escapeHtml(agent.sessionId)}</code>` : '<span style="color:var(--muted)">no session yet</span>'}</dd>
           <dt>Last activity</dt><dd>${relativeAge(agent.lastActivityMs)}</dd>
+          <dt>tmux</dt><dd>${agent.runtime.tmuxSession ? `<code>${escapeHtml(agent.runtime.tmuxSession)}</code>${agent.runtime.pid ? ` <span style="color:var(--muted)">pid ${agent.runtime.pid}</span>` : ""}` : '<span style="color:var(--muted)">not running under supervisor</span>'}</dd>
+          <dt>Restarts</dt><dd>${agent.runtime.restartCount}${agent.runtime.lastRestartAt ? ` <span style="color:var(--muted)">last ${relativeAge(agent.runtime.lastRestartAt)}</span>` : ""}${agent.runtime.circuitOpen ? ' <span style="color:var(--bad)">circuit open</span>' : ""}</dd>
         </dl>
       </div>
 
