@@ -63,12 +63,14 @@ function heartbeatLabel(state: SupervisorState): { ok: boolean; label: string } 
   };
 }
 
-export function renderHome(state: SupervisorState, projects: Project[]): string {
+export function renderHome(state: SupervisorState, projects: Project[], showOld = false): string {
   const hb = heartbeatLabel(state);
   const sidebar = renderSidebar({
     projects,
     heartbeatOk: hb.ok,
     heartbeatLabel: hb.label,
+    showOld,
+    currentPath: "/",
   });
 
   const agentSection = state.agents.length === 0
@@ -107,13 +109,15 @@ export function renderHome(state: SupervisorState, projects: Project[]): string 
   return shell("meta-scheduler", sidebar, content);
 }
 
-export function renderProject(state: SupervisorState, projects: Project[], project: Project): string {
+export function renderProject(state: SupervisorState, projects: Project[], project: Project, showOld = false): string {
   const hb = heartbeatLabel(state);
   const sidebar = renderSidebar({
     projects,
     activeProjectDir: project.dirName,
     heartbeatOk: hb.ok,
     heartbeatLabel: hb.label,
+    showOld,
+    currentPath: `/project/${encodeURIComponent(project.dirName)}`,
   });
 
   const list = project.sessions.length === 0

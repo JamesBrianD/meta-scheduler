@@ -1,4 +1,5 @@
 import type { Project } from "../sessions.ts";
+import { groupProjects } from "../sessions.ts";
 
 export const STYLES = `
   :root {
@@ -121,6 +122,18 @@ export const STYLES = `
     display: none;
   }
   .sidebar-project.open .sidebar-sessions { display: block; }
+  .sidebar-project.worktree .project-head { padding-left: 36px; font-size: 12.5px; color: var(--muted); }
+  .sidebar-project.worktree .caret { border-left-color: var(--muted-soft); }
+  .sidebar-project.worktree.active .project-head { color: var(--fg-soft); }
+  .sidebar-project .wt-badge {
+    font-size: 9.5px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted);
+    background: var(--idle-bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
   .sidebar-sessions li a {
     display: flex; align-items: baseline; gap: 8px;
     padding: 5px 18px 5px 36px;
@@ -149,8 +162,27 @@ export const STYLES = `
     flex-shrink: 0;
   }
 
-  .sidebar-footer {
+  .sidebar-toggle {
     margin-top: auto;
+    padding: 8px 14px 4px;
+  }
+  .sidebar-toggle .link-btn {
+    background: transparent;
+    border: 1px solid var(--border-soft);
+    padding: 5px 10px;
+    width: 100%;
+    border-radius: var(--radius-sm);
+    color: var(--muted);
+    font-size: 11.5px;
+    text-align: left;
+    cursor: pointer;
+  }
+  .sidebar-toggle .link-btn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-bg);
+  }
+  .sidebar-footer {
     padding: 12px 18px;
     border-top: 1px solid var(--border-soft);
     display: flex; align-items: center; gap: 10px;
@@ -401,6 +433,17 @@ export const STYLES = `
   }
 
   /* Conversation viewer */
+  .tail-banner {
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+    border-radius: var(--radius-sm);
+    padding: 8px 14px;
+    margin-bottom: 14px;
+    font-size: 12.5px;
+    text-align: center;
+  }
+  .tail-banner a { font-weight: 500; }
   .conv { display: grid; gap: 14px; }
   .session-meta {
     display: grid; grid-template-columns: 1fr; gap: 10px;
@@ -514,10 +557,12 @@ export interface SidebarOpts {
   activeSessionId?: string;
   heartbeatOk: boolean;
   heartbeatLabel: string;
+  showOld?: boolean;
+  currentPath?: string;
 }
 
 export function renderSidebar(opts: SidebarOpts): string {
-  const projectItems = opts.projects.map((p) => {
+  const renderOne = (p: Project, isWorktree: boolean): string => {
     const isActive = p.dirName === opts.activeProjectDir;
     const isOpen = isActive;
     const sessions = isOpen
@@ -526,16 +571,27 @@ export function renderSidebar(opts: SidebarOpts): string {
           return `<li${cls}><a href="/session/${encodeURIComponent(p.dirName)}/${encodeURIComponent(s.id)}" title="${escapeHtml(s.title)}"><span class="session-title">${escapeHtml(s.title)}</span><span class="session-age">${relativeAge(s.lastActivityMs)}</span></a></li>`;
         }).join("")}</ul>`
       : "";
+    const wtBadge = isWorktree && p.worktreeLabel
+      ? `<span class="wt-badge" title="${escapeHtml(p.worktreeLabel)}">wt</span>`
+      : "";
     return `
-      <div class="sidebar-project${isActive ? " active" : ""}${isOpen ? " open" : ""}">
+      <div class="sidebar-project${isActive ? " active" : ""}${isOpen ? " open" : ""}${isWorktree ? " worktree" : ""}">
         <a class="project-head" href="/project/${encodeURIComponent(p.dirName)}">
           <span class="caret"></span>
           <span class="project-name" title="${escapeHtml(p.cwd)}">${escapeHtml(p.displayName)}</span>
+          ${wtBadge}
           <span class="project-count">${p.sessionCount}</span>
         </a>
         ${sessions}
       </div>
     `;
+  };
+
+  const groups = groupProjects(opts.projects);
+  const projectItems = groups.map((g) => {
+    const head = renderOne(g.primary, !!g.primary.worktreeOf);
+    const wts = g.worktrees.map((w) => renderOne(w, true)).join("");
+    return head + wts;
   }).join("");
 
   return `
@@ -545,6 +601,9 @@ export function renderSidebar(opts: SidebarOpts): string {
       </div>
       <div class="sidebar-section-title">Projects</div>
       ${projectItems || '<div style="padding:20px 18px;color:var(--muted);font-size:12.5px;">No projects found in <code>~/.claude/projects/</code>.</div>'}
+      <form method="post" action="/toggle-old?back=${encodeURIComponent(opts.currentPath ?? "/")}" class="sidebar-toggle">
+        <button type="submit" class="link-btn">${opts.showOld ? "Hide sessions > 7d" : "Show all sessions"}</button>
+      </form>
       <div class="sidebar-footer ${opts.heartbeatOk ? "ok" : "bad"}">
         <span class="heartbeat-dot"></span>
         <span>${escapeHtml(opts.heartbeatLabel)}</span>

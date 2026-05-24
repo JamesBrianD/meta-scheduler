@@ -19,6 +19,13 @@ export interface Project {
   lastActivityMs: number;
   sessionCount: number;
   sessions: Session[];
+  worktreeOf?: string;
+  worktreeLabel?: string;
+}
+
+export interface ProjectGroup {
+  primary: Project;
+  worktrees: Project[];
 }
 
 const PROJECTS_DIR = join(homedir(), ".claude", "projects");
@@ -123,7 +130,8 @@ async function scanProjectDir(dirName: string): Promise<Project | null> {
   sessions.sort((a, b) => b.lastActivityMs - a.lastActivityMs);
 
   const cwd = sessions.find((s) => s.cwd)?.cwd ?? guessCwdFromDirName(dirName);
-  const displayName = basename(cwd);
+  const wt = detectWorktree(cwd);
+  const displayName = wt ? wt.name : basename(cwd);
   const lastActivityMs = sessions[0].lastActivityMs;
 
   return {
@@ -133,7 +141,57 @@ async function scanProjectDir(dirName: string): Promise<Project | null> {
     lastActivityMs,
     sessionCount: sessions.length,
     sessions,
+    ...(wt ? { worktreeOf: wt.parentCwd, worktreeLabel: wt.label } : {}),
   };
+}
+
+const WORKTREE_SEGMENTS = [".claude-worktrees", ".codex-worktrees", ".worktrees"];
+
+function detectWorktree(cwd: string): { parentCwd: string; name: string; label: string } | null {
+  for (const seg of WORKTREE_SEGMENTS) {
+    const marker = `/${seg}/`;
+    const idx = cwd.indexOf(marker);
+    if (idx < 0) continue;
+    const parentCwd = cwd.slice(0, idx);
+    const after = cwd.slice(idx + marker.length);
+    const name = after.split("/")[0];
+    if (!name) continue;
+    return { parentCwd, name, label: seg.replace(/^\./, "") };
+  }
+  return null;
+}
+
+export function groupProjects(projects: Project[]): ProjectGroup[] {
+  const byCwd = new Map<string, Project>();
+  for (const p of projects) byCwd.set(p.cwd, p);
+
+  const worktreesByParent = new Map<string, Project[]>();
+  const standalone: Project[] = [];
+  const orphanWorktrees: Project[] = [];
+
+  for (const p of projects) {
+    if (p.worktreeOf && byCwd.has(p.worktreeOf)) {
+      const arr = worktreesByParent.get(p.worktreeOf) ?? [];
+      arr.push(p);
+      worktreesByParent.set(p.worktreeOf, arr);
+    } else if (p.worktreeOf) {
+      orphanWorktrees.push(p);
+    } else {
+      standalone.push(p);
+    }
+  }
+
+  const groups: ProjectGroup[] = [];
+  for (const p of standalone) {
+    const wts = (worktreesByParent.get(p.cwd) ?? []).slice().sort((a, b) => b.lastActivityMs - a.lastActivityMs);
+    const groupActivity = Math.max(p.lastActivityMs, ...wts.map((w) => w.lastActivityMs));
+    groups.push({ primary: { ...p, lastActivityMs: groupActivity }, worktrees: wts });
+  }
+  for (const p of orphanWorktrees) {
+    groups.push({ primary: p, worktrees: [] });
+  }
+  groups.sort((a, b) => b.primary.lastActivityMs - a.primary.lastActivityMs);
+  return groups;
 }
 
 function guessCwdFromDirName(dirName: string): string {
@@ -183,6 +241,25 @@ export async function readSessionEvents(projectDir: string, sessionId: string, m
   } finally {
     await fh.close();
   }
+}
+
+const RECENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function filterRecent(projects: Project[], showOld: boolean): Project[] {
+  if (showOld) return projects;
+  const cutoff = Date.now() - RECENT_WINDOW_MS;
+  const out: Project[] = [];
+  for (const p of projects) {
+    const sessions = p.sessions.filter((s) => s.lastActivityMs >= cutoff);
+    if (sessions.length === 0) continue;
+    out.push({
+      ...p,
+      sessions,
+      sessionCount: sessions.length,
+      lastActivityMs: sessions[0].lastActivityMs,
+    });
+  }
+  return out;
 }
 
 export function findProject(projects: Project[], dirName: string): Project | undefined {

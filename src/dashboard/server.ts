@@ -6,7 +6,7 @@ import { renderHome, renderProject } from "./views/list.ts";
 import { renderSessionView } from "./views/session.ts";
 import { dropTask, InboxError } from "./inbox.ts";
 import { readRestartLog } from "./restart-log.ts";
-import { findProject, findSession, listProjects, readSessionEvents } from "./sessions.ts";
+import { filterRecent, findProject, findSession, listProjects, readSessionEvents } from "./sessions.ts";
 import { tailSession } from "./sse.ts";
 
 interface ServerOpts {
@@ -58,22 +58,44 @@ function findAgent(state: SupervisorState, name: string) {
   return state.agents.find((a) => a.name === name);
 }
 
+function readCookie(req: IncomingMessage, name: string): string | null {
+  const raw = req.headers.cookie;
+  if (!raw) return null;
+  for (const part of raw.split(/;\s*/)) {
+    const eq = part.indexOf("=");
+    if (eq < 0) continue;
+    if (part.slice(0, eq) === name) return decodeURIComponent(part.slice(eq + 1));
+  }
+  return null;
+}
+
 export function startServer(opts: ServerOpts) {
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
     const method = req.method ?? "GET";
     const state = opts.getState();
+    const showOld = readCookie(req, "ms_show_old") === "1";
 
     try {
+      if (method === "POST" && url.pathname === "/toggle-old") {
+        const next = showOld ? "" : "1";
+        const back = url.searchParams.get("back") || "/";
+        const cookie = next
+          ? `ms_show_old=1; Path=/; Max-Age=2592000; SameSite=Lax`
+          : `ms_show_old=; Path=/; Max-Age=0; SameSite=Lax`;
+        res.writeHead(303, { "Set-Cookie": cookie, Location: back });
+        res.end();
+        return;
+      }
       if (method === "GET" && url.pathname === "/") {
-        const projects = await listProjects();
-        return html(res, 200, renderHome(state, projects));
+        const projects = filterRecent(await listProjects(), showOld);
+        return html(res, 200, renderHome(state, projects, showOld));
       }
       if (method === "GET" && url.pathname === "/api/state") {
         return json(res, 200, state);
       }
       if (method === "GET" && url.pathname === "/api/projects") {
-        const projects = await listProjects();
+        const projects = filterRecent(await listProjects(), showOld);
         return json(res, 200, projects);
       }
       if (method === "GET" && url.pathname === "/healthz") {
@@ -91,23 +113,26 @@ export function startServer(opts: ServerOpts) {
       const projectMatch = /^\/project\/([^/]+)\/?$/.exec(url.pathname);
       if (projectMatch && method === "GET") {
         const dirName = decodeURIComponent(projectMatch[1]);
-        const projects = await listProjects();
-        const project = findProject(projects, dirName);
+        const allProjects = await listProjects();
+        const sidebarProjects = filterRecent(allProjects, showOld);
+        const project = findProject(allProjects, dirName);
         if (!project) return notFound(res);
-        return html(res, 200, renderProject(state, projects, project));
+        return html(res, 200, renderProject(state, sidebarProjects, project, showOld));
       }
 
       const sessionMatch = /^\/session\/([^/]+)\/([^/]+)\/?$/.exec(url.pathname);
       if (sessionMatch && method === "GET") {
         const dirName = decodeURIComponent(sessionMatch[1]);
         const sessionId = decodeURIComponent(sessionMatch[2]);
-        const projects = await listProjects();
-        const project = findProject(projects, dirName);
+        const allProjects = await listProjects();
+        const sidebarProjects = filterRecent(allProjects, showOld);
+        const project = findProject(allProjects, dirName);
         if (!project) return notFound(res);
         const session = findSession(project, sessionId);
         if (!session) return notFound(res);
         const events = await readSessionEvents(dirName, sessionId).catch(() => []);
-        return html(res, 200, renderSessionView(state, projects, project, session, events));
+        const showAll = url.searchParams.get("all") === "1";
+        return html(res, 200, renderSessionView(state, sidebarProjects, project, session, events, showAll, showOld));
       }
 
       const agentMatch = /^\/agent\/([^/]+)(\/(tail|inbox))?$/.exec(url.pathname);
@@ -120,8 +145,8 @@ export function startServer(opts: ServerOpts) {
         if (method === "GET" && !sub) {
           const dropped = url.searchParams.get("dropped");
           const restarts = await readRestartLog(agent.name);
-          const projects = await listProjects();
-          return html(res, 200, renderDetail(state, projects, agent, dropped, restarts));
+          const projects = filterRecent(await listProjects(), showOld);
+          return html(res, 200, renderDetail(state, projects, agent, dropped, restarts, showOld));
         }
         if (method === "GET" && sub === "tail") {
           if (!agent.sessionFile) return text(res, 409, "no session file yet");

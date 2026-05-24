@@ -123,12 +123,16 @@ function fmtTime(iso: string | undefined): string {
   }
 }
 
+const TAIL_LIMIT = 20;
+
 export function renderSessionView(
   state: SupervisorState,
   projects: Project[],
   project: Project,
   session: Session,
   events: any[],
+  showAll = false,
+  showOld = false,
 ): string {
   const sidebar = renderSidebar({
     projects,
@@ -136,13 +140,14 @@ export function renderSessionView(
     activeSessionId: session.id,
     heartbeatOk: !!(state.lastProbeAt && Date.now() - state.lastProbeAt < 60_000),
     heartbeatLabel: state.lastProbeAt ? `supervisor · ${relativeAge(state.lastProbeAt)}` : "supervisor offline",
+    showOld,
+    currentPath: `/session/${encodeURIComponent(project.dirName)}/${encodeURIComponent(session.id)}`,
   });
 
   const cwd = session.cwd ?? project.cwd;
   const resumeCmd = `cd ${shellEscape(cwd)} && claude --resume ${session.id}`;
 
   const messages: string[] = [];
-  let firstAssistant = true;
   for (const ev of events) {
     if (ev?.isSidechain) continue;
     const t = ev?.type;
@@ -167,10 +172,17 @@ export function renderSessionView(
             ${html}
           </div>
         `);
-        firstAssistant = false;
       }
     }
   }
+
+  const totalCount = messages.length;
+  const tailed = !showAll && totalCount > TAIL_LIMIT ? messages.slice(-TAIL_LIMIT) : messages;
+  const tailBanner = !showAll && totalCount > TAIL_LIMIT
+    ? `<div class="tail-banner">Showing last ${TAIL_LIMIT} of ${totalCount} messages · <a href="?all=1">show full transcript</a></div>`
+    : showAll && totalCount > TAIL_LIMIT
+      ? `<div class="tail-banner">Showing all ${totalCount} messages · <a href="?">show tail only</a></div>`
+      : "";
 
   const summary = `${session.title}`;
 
@@ -196,8 +208,9 @@ export function renderSessionView(
           <button type="button" onclick="copyResume(this)">Copy</button>
         </div>
       </div>
+      ${tailBanner}
       <div class="conv">
-        ${messages.length > 0 ? messages.join("") : '<div class="empty">No renderable messages.</div>'}
+        ${tailed.length > 0 ? tailed.join("") : '<div class="empty">No renderable messages.</div>'}
       </div>
     </main>
     <script>

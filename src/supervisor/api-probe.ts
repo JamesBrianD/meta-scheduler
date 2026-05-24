@@ -1,6 +1,6 @@
 import type { ApiProbeState } from "./types.ts";
 
-const PROBE_URL = "https://api.anthropic.com/";
+const PROBE_URL = "https://www.bing.com/";
 const PROBE_TIMEOUT_MS = 5_000;
 
 export function initialApiProbeState(): ApiProbeState {

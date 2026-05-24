@@ -85,7 +85,7 @@ function restartLogPanel(entries: RestartLogEntry[]): string {
   `;
 }
 
-export function renderDetail(state: SupervisorState, projects: Project[], agent: AgentState, dropped: string | null | undefined, restarts: RestartLogEntry[]): string {
+export function renderDetail(state: SupervisorState, projects: Project[], agent: AgentState, dropped: string | null | undefined, restarts: RestartLogEntry[], showOld = false): string {
   const resumeCmd = agent.sessionId
     ? `cd ${shellEscape(agent.home)} && claude --resume ${agent.sessionId}`
     : `cd ${shellEscape(agent.home)} && claude`;
@@ -102,6 +102,8 @@ export function renderDetail(state: SupervisorState, projects: Project[], agent:
     projects,
     heartbeatOk: !!(state.lastProbeAt && Date.now() - state.lastProbeAt < 60_000),
     heartbeatLabel: state.lastProbeAt ? `supervisor · ${relativeAge(state.lastProbeAt)}` : "supervisor offline",
+    showOld,
+    currentPath: `/agent/${encodeURIComponent(agent.name)}`,
   });
 
   const body = `
