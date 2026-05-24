@@ -1,6 +1,7 @@
 import type { AgentState, SupervisorState } from "../../supervisor/types.ts";
 import type { RestartLogEntry } from "../restart-log.ts";
-import { escapeHtml, page, relativeAge, statusBadge } from "./layout.ts";
+import type { Project } from "../sessions.ts";
+import { escapeHtml, relativeAge, renderSidebar, shell, statusBadge } from "./layout.ts";
 
 function shellEscape(s: string): string {
   if (/^[A-Za-z0-9_./@:-]+$/.test(s)) return s;
@@ -84,7 +85,7 @@ function restartLogPanel(entries: RestartLogEntry[]): string {
   `;
 }
 
-export function renderDetail(state: SupervisorState, agent: AgentState, dropped: string | null | undefined, restarts: RestartLogEntry[]): string {
+export function renderDetail(state: SupervisorState, projects: Project[], agent: AgentState, dropped: string | null | undefined, restarts: RestartLogEntry[]): string {
   const resumeCmd = agent.sessionId
     ? `cd ${shellEscape(agent.home)} && claude --resume ${agent.sessionId}`
     : `cd ${shellEscape(agent.home)} && claude`;
@@ -97,9 +98,15 @@ export function renderDetail(state: SupervisorState, agent: AgentState, dropped:
     ? `<span class="heartbeat"><span style="width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent);"></span>probed ${relativeAge(state.lastProbeAt)}</span>`
     : `<span class="heartbeat" style="color:var(--bad)">supervisor stalled</span>`;
 
+  const sidebar = renderSidebar({
+    projects,
+    heartbeatOk: !!(state.lastProbeAt && Date.now() - state.lastProbeAt < 60_000),
+    heartbeatLabel: state.lastProbeAt ? `supervisor · ${relativeAge(state.lastProbeAt)}` : "supervisor offline",
+  });
+
   const body = `
     <header class="bar">
-      <h1><a href="/" style="color:inherit">meta-scheduler</a> <span class="crumb">/</span> ${escapeHtml(agent.name)}</h1>
+      <h1><a href="/" style="color:inherit">Home</a> <span class="crumb">/</span> agents <span class="crumb">/</span> ${escapeHtml(agent.name)}</h1>
       <div class="right">
         ${heartbeat}
         <a href="/api/state">JSON</a>
@@ -182,5 +189,5 @@ export function renderDetail(state: SupervisorState, agent: AgentState, dropped:
       }
     </script>
   `;
-  return page(`${agent.name} — meta-scheduler`, body);
+  return shell(`${agent.name} — meta-scheduler`, sidebar, body);
 }

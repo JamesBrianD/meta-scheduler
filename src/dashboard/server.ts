@@ -2,9 +2,11 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { URL } from "node:url";
 import type { SupervisorState } from "../supervisor/types.ts";
 import { renderDetail } from "./views/detail.ts";
-import { renderList } from "./views/list.ts";
+import { renderHome, renderProject } from "./views/list.ts";
+import { renderSessionView } from "./views/session.ts";
 import { dropTask, InboxError } from "./inbox.ts";
 import { readRestartLog } from "./restart-log.ts";
+import { findProject, findSession, listProjects, readSessionEvents } from "./sessions.ts";
 import { tailSession } from "./sse.ts";
 
 interface ServerOpts {
@@ -64,10 +66,15 @@ export function startServer(opts: ServerOpts) {
 
     try {
       if (method === "GET" && url.pathname === "/") {
-        return html(res, 200, renderList(state));
+        const projects = await listProjects();
+        return html(res, 200, renderHome(state, projects));
       }
       if (method === "GET" && url.pathname === "/api/state") {
         return json(res, 200, state);
+      }
+      if (method === "GET" && url.pathname === "/api/projects") {
+        const projects = await listProjects();
+        return json(res, 200, projects);
       }
       if (method === "GET" && url.pathname === "/healthz") {
         const age = state.lastProbeAt ? Date.now() - state.lastProbeAt : null;
@@ -81,6 +88,28 @@ export function startServer(opts: ServerOpts) {
         });
       }
 
+      const projectMatch = /^\/project\/([^/]+)\/?$/.exec(url.pathname);
+      if (projectMatch && method === "GET") {
+        const dirName = decodeURIComponent(projectMatch[1]);
+        const projects = await listProjects();
+        const project = findProject(projects, dirName);
+        if (!project) return notFound(res);
+        return html(res, 200, renderProject(state, projects, project));
+      }
+
+      const sessionMatch = /^\/session\/([^/]+)\/([^/]+)\/?$/.exec(url.pathname);
+      if (sessionMatch && method === "GET") {
+        const dirName = decodeURIComponent(sessionMatch[1]);
+        const sessionId = decodeURIComponent(sessionMatch[2]);
+        const projects = await listProjects();
+        const project = findProject(projects, dirName);
+        if (!project) return notFound(res);
+        const session = findSession(project, sessionId);
+        if (!session) return notFound(res);
+        const events = await readSessionEvents(dirName, sessionId).catch(() => []);
+        return html(res, 200, renderSessionView(state, projects, project, session, events));
+      }
+
       const agentMatch = /^\/agent\/([^/]+)(\/(tail|inbox))?$/.exec(url.pathname);
       if (agentMatch) {
         const name = decodeURIComponent(agentMatch[1]);
@@ -91,7 +120,8 @@ export function startServer(opts: ServerOpts) {
         if (method === "GET" && !sub) {
           const dropped = url.searchParams.get("dropped");
           const restarts = await readRestartLog(agent.name);
-          return html(res, 200, renderDetail(state, agent, dropped, restarts));
+          const projects = await listProjects();
+          return html(res, 200, renderDetail(state, projects, agent, dropped, restarts));
         }
         if (method === "GET" && sub === "tail") {
           if (!agent.sessionFile) return text(res, 409, "no session file yet");

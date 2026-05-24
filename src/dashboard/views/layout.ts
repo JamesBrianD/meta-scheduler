@@ -1,3 +1,5 @@
+import type { Project } from "../sessions.ts";
+
 export const STYLES = `
   :root {
     --fg: #0f172a;
@@ -6,8 +8,10 @@ export const STYLES = `
     --muted-soft: #94a3b8;
     --bg: #f6f7f9;
     --surface: #ffffff;
+    --sidebar-bg: #fafbfc;
     --border: #e6e8ec;
     --border-soft: #eef0f3;
+    --hover: #f1f5f9;
     --accent: #4f46e5;
     --accent-bg: #eef2ff;
     --ok: #16a34a;
@@ -21,10 +25,11 @@ export const STYLES = `
     --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
     --radius: 10px;
     --radius-sm: 6px;
+    --sidebar-width: 280px;
   }
 
   * { box-sizing: border-box; }
-  html, body { background: var(--bg); }
+  html, body { background: var(--bg); height: 100%; }
   body {
     margin: 0;
     color: var(--fg);
@@ -35,25 +40,152 @@ export const STYLES = `
   a { color: var(--accent); text-decoration: none; }
   a:hover { text-decoration: underline; }
 
+  .shell {
+    display: grid;
+    grid-template-columns: var(--sidebar-width) 1fr;
+    min-height: 100vh;
+  }
+  .content-pane { min-width: 0; overflow-x: hidden; }
+
+  .sidebar {
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar .brand {
+    padding: 16px 18px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--fg);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .sidebar .brand a {
+    color: inherit; text-decoration: none;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .sidebar .brand .logo {
+    width: 18px; height: 18px;
+    border-radius: 4px;
+    background: linear-gradient(135deg, var(--accent), #7c3aed);
+    display: inline-block;
+  }
+  .sidebar-section-title {
+    padding: 14px 18px 6px;
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+  .sidebar-project { margin-bottom: 1px; }
+  .sidebar-project .project-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 18px;
+    color: var(--fg-soft);
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    font-size: 13px;
+    text-decoration: none;
+  }
+  .sidebar-project .project-head:hover { background: var(--hover); text-decoration: none; }
+  .sidebar-project.active .project-head { color: var(--fg); }
+  .sidebar-project .caret {
+    width: 0; height: 0;
+    border-left: 4px solid var(--muted-soft);
+    border-top: 3px solid transparent;
+    border-bottom: 3px solid transparent;
+    margin-right: 2px;
+    transition: transform 0.1s ease;
+    flex-shrink: 0;
+  }
+  .sidebar-project.open .caret { transform: rotate(90deg); }
+  .sidebar-project .project-name {
+    flex: 1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sidebar-project .project-count {
+    color: var(--muted-soft);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .sidebar-sessions {
+    list-style: none;
+    margin: 0; padding: 0;
+    display: none;
+  }
+  .sidebar-project.open .sidebar-sessions { display: block; }
+  .sidebar-sessions li a {
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 5px 18px 5px 36px;
+    color: var(--fg-soft);
+    font-size: 12.5px;
+    line-height: 1.45;
+    text-decoration: none;
+  }
+  .sidebar-sessions li a:hover {
+    background: var(--hover);
+    color: var(--fg);
+  }
+  .sidebar-sessions li.active a {
+    background: var(--accent-bg);
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .sidebar-sessions .session-title {
+    flex: 1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sidebar-sessions .session-age {
+    color: var(--muted-soft);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 12px 18px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; align-items: center; gap: 10px;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .sidebar-footer .heartbeat-dot { width: 7px; height: 7px; border-radius: 50%; }
+  .sidebar-footer.ok .heartbeat-dot { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent); }
+  .sidebar-footer.bad .heartbeat-dot { background: var(--bad); }
+
+  main {
+    padding: 24px 32px 64px;
+    max-width: 1180px;
+    overflow-x: hidden;
+  }
+  main.narrow { max-width: 880px; }
+  main.wide { max-width: 100%; }
+
   header.bar {
     display: flex; align-items: center; gap: 16px;
-    padding: 14px 28px;
+    padding: 14px 32px;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 5;
   }
   header.bar h1 {
-    margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
+    margin: 0; font-size: 14px; font-weight: 600; letter-spacing: -0.01em;
   }
-  header.bar h1 .crumb { color: var(--muted); font-weight: 500; }
+  header.bar h1 .crumb { color: var(--muted); font-weight: 500; margin: 0 6px; }
   header.bar .meta {
     color: var(--muted); font-size: 12.5px; display: flex; align-items: center; gap: 6px;
   }
   header.bar .meta code { background: var(--idle-bg); }
   header.bar .right { margin-left: auto; display: flex; gap: 14px; align-items: center; }
   header.bar .heartbeat { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12.5px; }
-
-  main { padding: 24px 28px 64px; max-width: 1180px; }
-  main.narrow { max-width: 880px; }
 
   .card {
     background: var(--surface);
@@ -81,13 +213,10 @@ export const STYLES = `
     border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
-    transition: border-color 0.15s ease, transform 0.05s ease;
+    transition: border-color 0.15s ease;
   }
   .agent-row:hover { border-color: #d6d9df; }
-  .agent-row .name {
-    font-weight: 600; font-size: 15px; color: var(--fg);
-    letter-spacing: -0.005em;
-  }
+  .agent-row .name { font-weight: 600; font-size: 14.5px; color: var(--fg); }
   .agent-row .name a { color: inherit; }
   .agent-row .name a:hover { color: var(--accent); text-decoration: none; }
   .agent-row .current {
@@ -270,6 +399,88 @@ export const STYLES = `
     margin-bottom: 16px;
     font-size: 13px;
   }
+
+  /* Conversation viewer */
+  .conv { display: grid; gap: 14px; }
+  .session-meta {
+    display: grid; grid-template-columns: 1fr; gap: 10px;
+    margin-bottom: 4px;
+  }
+  .msg {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    box-shadow: var(--shadow);
+  }
+  .msg.user { border-left: 3px solid var(--accent); }
+  .msg.assistant { border-left: 3px solid var(--ok); }
+  .msg.system { border-left: 3px solid var(--muted-soft); background: var(--sidebar-bg); }
+  .msg .who {
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .msg .who .ts { font-weight: 400; color: var(--muted-soft); text-transform: none; letter-spacing: 0; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .msg .body {
+    font-size: 13.5px; line-height: 1.6;
+    color: var(--fg);
+    white-space: pre-wrap; word-wrap: break-word;
+  }
+  .msg .body pre {
+    background: var(--idle-bg);
+    padding: 10px 12px;
+    overflow-x: auto;
+    font-size: 12px;
+    margin: 8px 0;
+    white-space: pre;
+    border-radius: 4px;
+  }
+  .msg .tool-call {
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--idle-bg);
+    padding: 6px 10px;
+    border-radius: 4px;
+    margin: 6px 0;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    border: 1px solid var(--border-soft);
+  }
+  .msg .tool-call .tool-name { color: var(--accent); font-weight: 500; }
+  .msg .tool-result {
+    font-size: 11.5px;
+    color: var(--fg-soft);
+    background: var(--idle-bg);
+    padding: 8px 10px;
+    border-radius: 4px;
+    margin: 4px 0;
+    max-height: 200px;
+    overflow: auto;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    white-space: pre-wrap;
+  }
+
+  .session-list { display: grid; gap: 8px; }
+  .session-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 18px;
+    box-shadow: var(--shadow);
+    transition: border-color 0.15s ease;
+  }
+  .session-card:hover { border-color: #d6d9df; }
+  .session-card a { display: flex; align-items: baseline; gap: 12px; color: inherit; text-decoration: none; }
+  .session-card .session-card-title {
+    flex: 1; color: var(--fg); font-weight: 500;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .session-card .session-card-meta {
+    color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
 `;
 
 export function escapeHtml(s: string): string {
@@ -286,14 +497,80 @@ export function relativeAge(ms: number | null): string {
   const age = Date.now() - ms;
   if (age < 0) return "just now";
   if (age < 10_000) return "just now";
-  if (age < 60_000) return `${Math.floor(age / 1000)}s ago`;
-  if (age < 3_600_000) return `${Math.floor(age / 60_000)}m ago`;
-  if (age < 86_400_000) return `${Math.floor(age / 3_600_000)}h ago`;
-  return `${Math.floor(age / 86_400_000)}d ago`;
+  if (age < 60_000) return `${Math.floor(age / 1000)}s`;
+  if (age < 3_600_000) return `${Math.floor(age / 60_000)}m`;
+  if (age < 86_400_000) return `${Math.floor(age / 3_600_000)}h`;
+  if (age < 7 * 86_400_000) return `${Math.floor(age / 86_400_000)}d`;
+  return `${Math.floor(age / (7 * 86_400_000))}w`;
 }
 
 export function statusBadge(status: string): string {
   return `<span class="status ${escapeHtml(status)}"><span class="dot"></span>${escapeHtml(status)}</span>`;
+}
+
+export interface SidebarOpts {
+  projects: Project[];
+  activeProjectDir?: string;
+  activeSessionId?: string;
+  heartbeatOk: boolean;
+  heartbeatLabel: string;
+}
+
+export function renderSidebar(opts: SidebarOpts): string {
+  const projectItems = opts.projects.map((p) => {
+    const isActive = p.dirName === opts.activeProjectDir;
+    const isOpen = isActive;
+    const sessions = isOpen
+      ? `<ul class="sidebar-sessions">${p.sessions.slice(0, 30).map((s) => {
+          const cls = s.id === opts.activeSessionId ? ' class="active"' : "";
+          return `<li${cls}><a href="/session/${encodeURIComponent(p.dirName)}/${encodeURIComponent(s.id)}" title="${escapeHtml(s.title)}"><span class="session-title">${escapeHtml(s.title)}</span><span class="session-age">${relativeAge(s.lastActivityMs)}</span></a></li>`;
+        }).join("")}</ul>`
+      : "";
+    return `
+      <div class="sidebar-project${isActive ? " active" : ""}${isOpen ? " open" : ""}">
+        <a class="project-head" href="/project/${encodeURIComponent(p.dirName)}">
+          <span class="caret"></span>
+          <span class="project-name" title="${escapeHtml(p.cwd)}">${escapeHtml(p.displayName)}</span>
+          <span class="project-count">${p.sessionCount}</span>
+        </a>
+        ${sessions}
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <aside class="sidebar">
+      <div class="brand">
+        <a href="/"><span class="logo"></span>meta-scheduler</a>
+      </div>
+      <div class="sidebar-section-title">Projects</div>
+      ${projectItems || '<div style="padding:20px 18px;color:var(--muted);font-size:12.5px;">No projects found in <code>~/.claude/projects/</code>.</div>'}
+      <div class="sidebar-footer ${opts.heartbeatOk ? "ok" : "bad"}">
+        <span class="heartbeat-dot"></span>
+        <span>${escapeHtml(opts.heartbeatLabel)}</span>
+      </div>
+    </aside>
+  `;
+}
+
+export function shell(title: string, sidebar: string, content: string, extraHead = ""): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light only">
+<title>${escapeHtml(title)}</title>
+<style>${STYLES}</style>
+${extraHead}
+</head>
+<body>
+<div class="shell">
+${sidebar}
+<div class="content-pane">${content}</div>
+</div>
+</body>
+</html>`;
 }
 
 export function page(title: string, body: string, extraHead = ""): string {
